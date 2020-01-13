@@ -73,14 +73,12 @@ public:
 		next_list = new vector<pair<int,BranchLabelIndex>>();
 	}
 	void set_next_list(vector<pair<int,BranchLabelIndex>>& list){
-		next_list = new string(new_place);
+		next_list = new vector<pair<int,BranchLabelIndex>>(list);
 	}
 	vector<pair<int,BranchLabelIndex>>& get_next_list(){
 		return *next_list;
 	}
-	vector<pair<int,BranchLabelIndex>>& get_merged_next_list(vector<pair<int,BranchLabelIndex>>& list){
-		return code_buffer.merge(*next_list, list);
-	}
+
 };
 
 class Statements : public Statement{};
@@ -127,11 +125,11 @@ class BoolExp: public Exp{
 	vector<pair<int,BranchLabelIndex>>* true_list;
 	vector<pair<int,BranchLabelIndex>>* false_list;
 public:
-	void set_true_list(pair<int,BranchLabelIndex> item){
-		true_list = new vector<pair<int,BranchLabelIndex>>(code_buffer.makelist(item));
+	void set_true_list(vector<pair<int,BranchLabelIndex>>& item){
+		true_list = new vector<pair<int,BranchLabelIndex>>(item);
 	}
-	void set_false_list(pair<int,BranchLabelIndex> item){
-		false_list = new vector<pair<int,BranchLabelIndex>>(code_buffer.makelist(item));
+	void set_false_list(vector<pair<int,BranchLabelIndex>>& item){
+		false_list = new vector<pair<int,BranchLabelIndex>>(item);
 	}
 	vector<pair<int,BranchLabelIndex>>& get_true_list(){
 		return *true_list;
@@ -235,8 +233,8 @@ class M{
 	string* quad;
 	
 public:
-	void set_quad(){
-		quad = new string(code_buffer.genLabel());
+	void set_quad(string& label){
+		quad = new string(label));
 	}
 	string& get_quad(){
 		return *quad;
@@ -248,10 +246,7 @@ class N{
 	
 public:
 	void set_next_list(vector<pair<int,BranchLabelIndex>>& list){
-		next_list = new string(new_place);
-	}
-	vector<pair<int,BranchLabelIndex>>& get_merged_next_list(vector<pair<int,BranchLabelIndex>>& list){
-		return code_buffer.merge(*next_list, list);
+		next_list = new string(list);
 	}
 	vector<pair<int,BranchLabelIndex>>& get_next_list(){
 		return *next_list;

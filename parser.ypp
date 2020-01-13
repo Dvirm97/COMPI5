@@ -425,10 +425,10 @@ Exp:	LPAREN Exp RPAREN{
 			$$.set_enumVal($1.get_id());
 			string type = symbol_table.get_var_type($1.get_id());
 			if (type == "BOOL"){
-				i_type = "i8";
+				string i_type = "i8";
 			}
 			else if(type == "INT"){
-				i_type = "i32";
+				string i_type = "i32";
 			}
 			else{
 				output::errorUndef(yylineno, "MESSAGE SEE ENUMS FOR ID DERIVE");
@@ -438,7 +438,8 @@ Exp:	LPAREN Exp RPAREN{
 			string reg1 = freshVar();
 			code_buffer.emit( reg1 + "= getelementptr" + i_type + "i32* %stack i32" + offset);
 			string reg2 = freshVar();
-			code_buffer.emit( reg2 + "= load" + i_type + ", " + i_type + reg1 );
+			code_buffer.emit( reg2 + "= load" + i_type + ", " + i_type + reg1);
+			$$.set_place(reg2);
 		}
 		|Call{
 			$$.reset();
@@ -466,13 +467,9 @@ Exp:	LPAREN Exp RPAREN{
 		}
 		|TRUE{
 			$$.reset();
-			$$.set_enumVal($1.get_id());
-			$$.set_type("BOOL");
 		}
 		|FALSE{
 			$$.reset();
-			$$.set_enumVal($1.get_id());
-			$$.set_type("BOOL");
 		}
 		|NOT Exp{
 			$$.reset();
@@ -581,5 +578,7 @@ string freshVar(){
 }
 
 int main(){
-	return yyparse();
+	int y = yyparse();
+	code_buffer.printCodeBuffer();
+	return y;
 }
