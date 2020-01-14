@@ -591,7 +591,7 @@ Exp:	LPAREN Exp RPAREN{
 
 			//LLVM:
 			string reg = freshVar();
-			string str = reg + " = icmp eq i1 " + ($1.get_place()) + ", " + ($3.get_place());
+			string str = reg + " = icmp eq i32 " + ($1.get_place()) + ", " + ($3.get_place());
 			int line = code_buffer.emit(str);
 			string str2 = "br i1 " + reg + ", label @, label @";
 			int next = code_buffer.emit(str2);
@@ -607,7 +607,7 @@ Exp:	LPAREN Exp RPAREN{
 
 			//LLVM:
 			string reg = freshVar();
-			string str = reg + " = icmp ne i1 " + ($1.get_place()) + ", " + ($3.get_place());
+			string str = reg + " = icmp ne i32 " + ($1.get_place()) + ", " + ($3.get_place());
 			int line = code_buffer.emit(str);
 			string str2 = "br i1 " + reg + ", label @, label @";
 			int next = code_buffer.emit(str2);
@@ -625,9 +625,9 @@ Exp:	LPAREN Exp RPAREN{
 			string reg = freshVar();
 			string str;
 			if ($1.get_type() == "BYTE" && $3.get_type() == "BYTE")
-			    str = reg + " = icmp ult i1 " + ($1.get_place()) + ", " + ($3.get_place());
+			    str = reg + " = icmp ult i32 " + ($1.get_place()) + ", " + ($3.get_place());
 			else
-			    str = reg + " = icmp slt i1 " + ($1.get_place()) + ", " + ($3.get_place());
+			    str = reg + " = icmp slt i32 " + ($1.get_place()) + ", " + ($3.get_place());
 			int line = code_buffer.emit(str);
 			string str2 = "br i1 " + reg + ", label @, label @";
 			int next = code_buffer.emit(str2);
@@ -645,9 +645,9 @@ Exp:	LPAREN Exp RPAREN{
 			string reg = freshVar();
 			string str;
 			if ($1.get_type() == "BYTE" && $3.get_type() == "BYTE")
-			    str = reg + " = icmp ugt i1 " + ($1.get_place()) + ", " + ($3.get_place());
+			    str = reg + " = icmp ugt i32 " + ($1.get_place()) + ", " + ($3.get_place());
 			else
-			    str = reg + " = icmp sgt i1 " + ($1.get_place()) + ", " + ($3.get_place());
+			    str = reg + " = icmp sgt i32 " + ($1.get_place()) + ", " + ($3.get_place());
 			int line = code_buffer.emit(str);
 			string str2 = "br i1 " + reg + ", label @, label @";
 			int next = code_buffer.emit(str2);
@@ -665,9 +665,9 @@ Exp:	LPAREN Exp RPAREN{
 			string reg = freshVar();
 			string str;
 			if ($1.get_type() == "BYTE" && $3.get_type() == "BYTE")
-			    str = reg + " = icmp ule i1 " + ($1.get_place()) + ", " + ($3.get_place());
+			    str = reg + " = icmp ule i32 " + ($1.get_place()) + ", " + ($3.get_place());
 			else
-			    str = reg + " = icmp sle i1 " + ($1.get_place()) + ", " + ($3.get_place());
+			    str = reg + " = icmp sle i32 " + ($1.get_place()) + ", " + ($3.get_place());
 			int line = code_buffer.emit(str);
 			string str2 = "br i1 " + reg + ", label @, label @";
 			int next = code_buffer.emit(str2);
@@ -685,9 +685,9 @@ Exp:	LPAREN Exp RPAREN{
 			string reg = freshVar();
 			string str;
 			if ($1.get_type() == "BYTE" && $3.get_type() == "BYTE")
-			    str = reg + " = icmp uge i1 " + ($1.get_place()) + ", " + ($3.get_place());
+			    str = reg + " = icmp uge i32 " + ($1.get_place()) + ", " + ($3.get_place());
 			else
-			    str = reg + " = icmp sge i1 " + ($1.get_place()) + ", " + ($3.get_place());
+			    str = reg + " = icmp sge i32 " + ($1.get_place()) + ", " + ($3.get_place());
 			int line = code_buffer.emit(str);
 			string str2 = "br i1 " + reg + ", label @, label @";
 			int next = code_buffer.emit(str2);
