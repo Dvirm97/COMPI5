@@ -14,7 +14,7 @@
 	bool while_flag;
 	string RetType_flag;
 	CodeBuffer& code_buffer = CodeBuffer::instance();
-	
+
 	string freshVar(){
 		var_num++;
 		return "%" + to_string(var_num);
@@ -34,11 +34,11 @@
 %left BINOP_SUB
 %right NOT
 %left LPAREN RPAREN LBRACE RBRACE
-%nonassoc IF WHILE RETURN BREAK CONTINUE INT BYTE BOOL STRING B ENUM SC VOID TRUE FALSE COMMA 
+%nonassoc IF WHILE RETURN BREAK CONTINUE INT BYTE BOOL STRING B ENUM SC VOID TRUE FALSE COMMA
 %nonassoc<id> ID
 %nonassoc<num> NUM
 %right ELSE
-	
+
 %type<ret_type> RetType
 %type<formals> Formals
 %type<formals_list> FormalsList
@@ -52,6 +52,9 @@
 %type<type> Type
 %type<enum_type> EnumType
 %type<exp> Exp
+%type<bool_exp> BoolExp
+%type<m> M;
+%type<n> N;
 
 %%
 
@@ -86,11 +89,11 @@ FuncDecl:	RetType {
 						output::errorDef(yylineno, e.get_raised_id());
 						exit(0);
 					}catch(Symbol_Table::ST_mismatch& e){
-						//if the 
+						//if the
 						output::errorMismatch(yylineno);
 						exit(0);
 					}catch(Symbol_Table::ST_undefEnum& e){
-						// enum doesnt exist 
+						// enum doesnt exist
 						output::errorUndefEnum(yylineno , e.get_raised_id());
 						exit(0);
 					}
@@ -163,7 +166,7 @@ Enumerator: ID{
 ;
 Statements:	Statement{
 				$$.set_type($1.get_type());
-			}	
+			}
 			|Statements Statement{
 				$$.set_type2($1.get_type(), $2.get_type());
 			}
@@ -183,11 +186,11 @@ Statement:	LBRACE OpenScope Statements CloseScope RBRACE{
 			|EnumType ID SC{
 				try{
 					symbol_table.insertEnumVar($2.get_id(),$1.get_type());
-				}catch(Symbol_Table::ST_undefEnum& e){ 
+				}catch(Symbol_Table::ST_undefEnum& e){
 				// the type doesnt exists
 					output::errorUndefEnum(yylineno , e.get_raised_id());
 					exit(0);
-				}catch(Symbol_Table::ST_def& e){ 
+				}catch(Symbol_Table::ST_def& e){
 				//the id exists:
 					output::errorDef(yylineno, e.get_raised_id());
 					exit(0);
@@ -204,7 +207,7 @@ Statement:	LBRACE OpenScope Statements CloseScope RBRACE{
 				}
 				try{
 					symbol_table.insert($2.get_id(), $1.get_type());
-				}catch(Symbol_Table::ST_def& e){ // the id is used already 
+				}catch(Symbol_Table::ST_def& e){ // the id is used already
 					output::errorDef(yylineno, e.get_raised_id());
 					exit(0);
 				}
@@ -214,7 +217,7 @@ Statement:	LBRACE OpenScope Statements CloseScope RBRACE{
 				try{
 					symbol_table.insertEnumVar($2.get_id(), $1.get_type(), $4.get_enumVal());
 				}catch(Symbol_Table::ST_undefEnum& e){
-				// if the enum type doesnt exist 
+				// if the enum type doesnt exist
 					output::errorUndefEnum(yylineno , e.get_raised_id());
 					exit(0);
 				}catch(Symbol_Table::ST_def& e){
@@ -253,7 +256,7 @@ Statement:	LBRACE OpenScope Statements CloseScope RBRACE{
 					output::errorUndef(yylineno,e.get_raised_id());
 					exit(0);
 				}
-		
+
 				$$.set_type("VOID");
 			}
 			|Call SC{
@@ -273,11 +276,30 @@ Statement:	LBRACE OpenScope Statements CloseScope RBRACE{
 				}
 				$$.set_type($2.get_type());
 			}
-			|IF LPAREN BoolExp RPAREN OpenScope Statement CloseScope{
-				$$.set_type($6.get_type());
+			|IF LPAREN BoolExp RPAREN OpenScope M Statement CloseScope {
+				$$.set_type($7.get_type());
+
+				//LLVM:
+/*
+                int next = code_buffer.emit("br label @");
+                code_buffer.bpatch($3.get_true_list(), $6.get_quad());
+                vector<pair<int,BranchLabelIndex>> new_list = CodeBuffer::makelist(pair<int,BranchLabelIndex>(next, FIRST));
+                vector<pair<int,BranchLabelIndex>> merged_list = CodeBuffer::merge($3.get_false_list(), new_list);
+                $$.set_next_list(merged_list);
+*/
 			}
-			|IF LPAREN BoolExp RPAREN OpenScope Statement CloseScope ELSE OpenScope Statement CloseScope{
-				$$.set_type2($6.get_type(), $10.get_type());
+			|IF LPAREN BoolExp RPAREN OpenScope M Statement CloseScope ELSE N M OpenScope Statement CloseScope {
+				$$.set_type2($7.get_type(), $13.get_type());
+
+				//LLVM:
+/*
+				int next = code_buffer.emit("br label @");
+                code_buffer.bpatch($3.get_true_list(), $6.get_quad());
+                code_buffer.bpatch($3.get_false_list(), $11.get_quad());
+                vector<pair<int,BranchLabelIndex>> new_list = CodeBuffer::makelist(pair<int,BranchLabelIndex>(next, FIRST));
+                vector<pair<int,BranchLabelIndex>> merged_list = CodeBuffer::merge($10.get_next_list(), new_list);
+                $$.set_next_list(merged_list);
+*/
 			}
 			|WHILE LPAREN BoolExp RPAREN TurnOnWhile OpenScope Statement TurnOffWhile CloseScope{
 				$$.set_type($7.get_type());
@@ -307,7 +329,7 @@ Call:	ID LPAREN ExpList RPAREN{
 			exit(0);
 			}
 			catch(Symbol_Table::ST_prototypeMismatch& e) {
-			// there is prototypeMismatch 
+			// there is prototypeMismatch
 			output::errorPrototypeMismatch(yylineno, $1.get_id(), symbol_table.get_func_types($1.get_id()));
 			exit(0);
 			}
@@ -319,12 +341,12 @@ Call:	ID LPAREN ExpList RPAREN{
 				symbol_table.using_func($1.get_id(), *type_list);
 			}
 			catch(Symbol_Table::ST_undefFunc& e){
-			// the function doesn't exist 
+			// the function doesn't exist
 				output::errorUndefFunc(yylineno, e.get_raised_id());
 				exit(0);
 			}
 			catch(Symbol_Table::ST_prototypeMismatch& e){
-			//there is prototypeMismatch 
+			//there is prototypeMismatch
 				output::errorPrototypeMismatch(yylineno, $1.get_id(), symbol_table.get_func_types($1.get_id()));
 				exit(0);
 			}
@@ -465,16 +487,18 @@ Exp:	LPAREN Exp RPAREN{
 			}
 			$$.set_enumVal($1.get_id());
 			string type = symbol_table.get_var_type($1.get_id());
-			string i_type = "i_type";
-			if (type == "BYTE"){
-				string i_type = "i8";
+			string i_type;
+			if (type == "BOOL") {
+			    i_type = "i1";
 			}
-			else if(type == "INT"){
-				string i_type = "i32";
+			else if (type == "BYTE") {
+				i_type = "i8";
 			}
-			else{
-				output::errorUndef(yylineno, "MESSAGE SEE ENUMS FOR ID DERIVE");
-				exit(0);
+			else if(type == "INT") {
+				i_type = "i32";
+			}
+			else {
+			    i_type = "ERROR!!!";
 			}
 			int offset = symbol_table.get_offset($1.get_id());
 			string reg1 = freshVar();
@@ -494,8 +518,8 @@ Exp:	LPAREN Exp RPAREN{
 			$$.set_enumVal($1.get_value());
 			$$.set_type("INT");
 			$$.set_place($1.get_value());
-		} 
-		|NUM B{
+		}
+		|NUM B {
 			$$.reset();
 			$$.set_enumVal($1.get_value());
 			if ($1.get_type() != "BYTE"){
@@ -505,49 +529,66 @@ Exp:	LPAREN Exp RPAREN{
 			$$.set_type("BYTE");
 			$$.set_place($1.get_value());
 		}
-		|STRING{
+		|STRING {
 			$$.reset();
 			$$.set_type("STRING");
 		}
-		|TRUE{
+		|TRUE {
 			$$.reset();
+			$$.set_type("BOOL");
+
 		}
-		|FALSE{
+		|FALSE {
 			$$.reset();
+			$$.set_type("BOOL");
 		}
-		|NOT Exp{
+		|NOT Exp {
 			$$.reset();
-			if ($2.get_type() != "BOOL" ){
+			if ($2.get_type() != "BOOL" ) {
 				output::errorMismatch(yylineno);
          		exit(0);
 			}
 			$$.set_type("BOOL");
 		}
-		|Exp AND Exp{
+		|Exp AND M Exp {
 			$$.reset();
-			if ($1.get_type() != "BOOL" || $3.get_type() != "BOOL" ){
+			if ($1.get_type() != "BOOL" || $4.get_type() != "BOOL" ){
+				output::errorMismatch(yylineno);
+         		exit(0);
+			}
+			$$.set_type("BOOL");
+/*
+            //LLVM:
+            code_buffer.bpatch($1.get_true_list(), $3.get_quad());
+            vector<pair<int,BranchLabelIndex>> merged_list = CodeBuffer::merge($1.get_false_list(), $4.get_false_list());
+            $$.set_false_list(merged_list);
+            $$.set_true_list($4.get_true_list());
+*/
+		}
+		|Exp OR M Exp {
+			$$.reset();
+			if ($1.get_type() != "BOOL" || $4.get_type() != "BOOL" ) {
+				output::errorMismatch(yylineno);
+         		exit(0);
+			}
+			$$.set_type("BOOL");
+/*
+            //LLVM:
+            code_buffer.bpatch($1.get_false_list(), $3.get_quad());
+            vector<pair<int,BranchLabelIndex>> merged_list = CodeBuffer::merge($1.get_true_list(), $4.get_true_list());
+            $$.set_true_list(merged_list);
+            $$.set_false_list($4.get_false_list());
+*/
+		}
+		|Exp RELOP_EQ Exp {
+			$$.reset();
+			if (($1.get_type() != "INT" && $1.get_type() != "BYTE") || ($3.get_type() != "INT" && $3.get_type() != "BYTE")) {
 				output::errorMismatch(yylineno);
          		exit(0);
 			}
 			$$.set_type("BOOL");
 		}
-		|Exp OR Exp{
-			$$.reset();
-			if ($1.get_type() != "BOOL" || $3.get_type() != "BOOL" ){
-				output::errorMismatch(yylineno);
-         		exit(0);
-			}
-			$$.set_type("BOOL");
-		}
-		|Exp RELOP_EQ Exp{
-			$$.reset();
-			if (($1.get_type()!= "INT" && $1.get_type()!= "BYTE") || ($3.get_type()!= "INT" && $3.get_type()!= "BYTE")){
-				output::errorMismatch(yylineno);
-         		exit(0);
-			}
-			$$.set_type("BOOL");
-		}
-		|Exp RELOP_REL Exp{
+		|Exp RELOP_REL Exp {
 			$$.reset();
 			if (($1.get_type()!= "INT" && $1.get_type()!= "BYTE") || ($3.get_type()!= "INT" && $3.get_type()!= "BYTE")){
 				output::errorMismatch(yylineno);
@@ -574,13 +615,14 @@ Exp:	LPAREN Exp RPAREN{
 		}
 ;
 BoolExp: Exp {
+            //$$.BoolExp_reset();
 			if ($1.get_type() != "BOOL"){
 				output::errorMismatch(yylineno);
 				exit(0);
 				}
 			}
 ;
-InsertFunc:	/*epsilon*/{
+InsertFunc:	/*epsilon*/ {
 				while_flag = false;
 				vector<string> param1 = {"STRING"};
 				vector<string> param2 = {"INT"};
@@ -588,11 +630,11 @@ InsertFunc:	/*epsilon*/{
 				symbol_table.insertFunc("printi", "VOID", param2);
 			}
 ;
-OpenScope:/*epsilon*/{
+OpenScope: /*epsilon*/ {
 			symbol_table.openScope();
 		}
 ;
-CloseScope:/*epsilon*/{
+CloseScope: /*epsilon*/ {
 	try{
 			symbol_table.closeScope();
 		}catch(Symbol_Table::ST_empty){
@@ -601,24 +643,37 @@ CloseScope:/*epsilon*/{
 		}
 }
 ;
-TurnOnWhile:/*epsilon*/{
+TurnOnWhile: /*epsilon*/ {
 			while_flag = true;
 		}
 ;
-TurnOffWhile:/*epsilon*/{
+TurnOffWhile: /*epsilon*/ {
 			while_flag = false;
+		}
+;
+
+M: /*epsilon*/ {
+            string str = code_buffer.genLabel();
+			$$.set_quad(str);
+		}
+;
+
+N: /*epsilon*/ {
+			int next = code_buffer.emit("br label @");
+			vector<pair<int,BranchLabelIndex>> new_list = CodeBuffer::makelist(pair<int,BranchLabelIndex>(next, FIRST));
+            $$.set_next_list(new_list);
 		}
 ;
 %%
 
-int yyerror(const char * message){
+int yyerror(const char * message) {
 		output::errorSyn(yylineno);
 		exit(0);
 	}
 
 
-int main(){
+int main() {
 	int y = yyparse();
-	code_buffer.printCodeBuffer();
+	//code_buffer.printCodeBuffer();
 	return y;
 }
