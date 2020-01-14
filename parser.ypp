@@ -214,6 +214,15 @@ Statement:	LBRACE OpenScope Statements CloseScope RBRACE{
 				}
 				$$.set_type("VOID");
 			}
+			|BOOL ID ASSIGN BoolExp SC{
+            				try{
+            					symbol_table.insert($2.get_id(), "BOOL");
+            				}catch(Symbol_Table::ST_def& e){ // the id is used already
+            					output::errorDef(yylineno, e.get_raised_id());
+            					exit(0);
+            				}
+            				$$.set_type("VOID");
+            			}
 			|EnumType ID ASSIGN Exp SC{
 				try{
 					symbol_table.insertEnumVar($2.get_id(), $1.get_type(), $4.get_enumVal());
@@ -534,6 +543,32 @@ Exp:	LPAREN Exp RPAREN{
 			$$.reset();
 			$$.set_type("STRING");
 		}
+		|LPAREN Type RPAREN Exp {
+			$$.reset();
+			try{
+			if((symbol_table.get_datatype($4.get_enumVal()) != ENUM_VAR) && (symbol_table.get_datatype($4.get_enumVal()) != ENUM_VAL)) {
+				output::errorMismatch(yylineno);
+				exit(0);
+			}
+			}catch(Symbol_Table::ST_undef& e) {
+                output::errorUndef(yylineno, e.get_raised_id());
+              	exit(0);
+            }
+			if ($2.get_type() != "INT"){
+				output::errorMismatch(yylineno);
+         		exit(0);
+			}
+			$$.set_type("INT");
+		}
+;
+BoolExp: Exp {
+            //$$.BoolExp_reset();
+			if ($1.get_type() != "BOOL") {
+				output::errorMismatch(yylineno);
+				exit(0);
+				}
+
+			}
 		|TRUE {
 			$$.reset();
 			$$.set_type("BOOL");
@@ -693,31 +728,6 @@ Exp:	LPAREN Exp RPAREN{
 			int next = code_buffer.emit(str2);
 			//add true_list and false_list, maybe also add place
 		}
-		|LPAREN Type RPAREN Exp {
-			$$.reset();
-			try{
-			if((symbol_table.get_datatype($4.get_enumVal()) != ENUM_VAR) && (symbol_table.get_datatype($4.get_enumVal()) != ENUM_VAL)) {
-				output::errorMismatch(yylineno);
-				exit(0);
-			}
-			}catch(Symbol_Table::ST_undef& e) {
-                output::errorUndef(yylineno, e.get_raised_id());
-              	exit(0);
-            }
-			if ($2.get_type() != "INT"){
-				output::errorMismatch(yylineno);
-         		exit(0);
-			}
-			$$.set_type("INT");
-		}
-;
-BoolExp: Exp {
-            //$$.BoolExp_reset();
-			if ($1.get_type() != "BOOL"){
-				output::errorMismatch(yylineno);
-				exit(0);
-				}
-			}
 ;
 InsertFunc:	/*epsilon*/ {
 				while_flag = false;
