@@ -98,25 +98,25 @@ public:
 
 
 class Exp: public Type{
-    string* enum_value;
-    string* place;
+	string* value;
+	string* place;
 public:
-    void set_enumVal(const string& enumVal){
-        enum_value = new string(enumVal);
+	void set_Val(const string& Val){
+        value = new string(Val);
     }
-    void set_place(const string& new_place){
-        place = new string(new_place);
+	void set_place(const string& new_place){
+		place = new string(new_place);
+	}
+	 string& get_Val() const{
+        return *value;
     }
-    string& get_enumVal() const{
-        return *enum_value;
-    }
-    string& get_place() const{
-        return *place;
-    }
-    void reset(){
-        enum_value = new string();
-        place = new string();
-    }
+	string& get_place() const{
+		return *place;
+	}
+	void reset(){
+		value = new string();
+		place = new string();
+	}
 };
 
 class Call: public Exp{};
@@ -157,7 +157,9 @@ public:
     void insert(const Exp& exp){
         exp_list->insert(exp_list->begin(),exp);
     }
-
+	vector<Exp>& get_exp_list(){
+		return *exp_list;
+	}
     vector<string>& get_types_vector() {
         vector<string>* type_list = new vector<string>();
         for(auto & it : *exp_list) {
