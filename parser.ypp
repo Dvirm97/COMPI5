@@ -13,7 +13,13 @@
 	Symbol_Table symbol_table;
 	bool while_flag;
 	string RetType_flag;
-	CodeBuffer code_buffer;
+	CodeBuffer& code_buffer = CodeBuffer::instance();
+	
+	string freshVar(){
+		var_num++;
+		return "%" + to_string(var_num);
+	}
+
 %}
 
 %start prog
@@ -365,15 +371,17 @@ Exp:	LPAREN Exp RPAREN{
 			else{
 				$$.set_type("BYTE");
 			}
+			string i_type = "i_type";
 			if ($1.get_type()== "BYTE" && $3.get_type()== "BYTE"){
-				string i_type = "i8";
+				i_type = "i8";
 			}
 			else{
-				string i_type = "i32";
+				i_type = "i32";
 			}
 			string* new_place = new string(freshVar());
 			$$.set_place(*new_place);
-			code_buffer.emit(*new_place + "= mul" + i_type + $1.place + ", " + $3.place);
+			const string my_string3 =  *new_place + " = mul " + i_type + " " + $1.get_place() + ", " + $3.get_place();
+			code_buffer.emit(my_string3);
 		}
 		|Exp BINOP_DIV Exp{
 			$$.reset();
@@ -387,6 +395,17 @@ Exp:	LPAREN Exp RPAREN{
 			else{
 				$$.set_type("BYTE");
 			}
+			string i_type = "i_type";
+			if ($1.get_type()== "BYTE" && $3.get_type()== "BYTE"){
+				i_type = "i8";
+			}
+			else{
+				i_type = "i32";
+			}
+			string* new_place = new string(freshVar());
+			$$.set_place(*new_place);
+			const string my_string3 =  *new_place + " = div " + i_type + " " + $1.get_place() + ", " + $3.get_place();
+			code_buffer.emit(my_string3);
 		}
 		|Exp BINOP_ADD Exp{
 			$$.reset();
@@ -400,6 +419,17 @@ Exp:	LPAREN Exp RPAREN{
 			else{
 				$$.set_type("BYTE");
 			}
+			string i_type = "i_type";
+			if ($1.get_type()== "BYTE" && $3.get_type()== "BYTE"){
+				i_type = "i8";
+			}
+			else{
+				i_type = "i32";
+			}
+			string* new_place = new string(freshVar());
+			$$.set_place(*new_place);
+			const string my_string3 =  *new_place + " = add " + i_type + " " + $1.get_place() + ", " + $3.get_place();
+			code_buffer.emit(my_string3);
 		}
 		|Exp BINOP_SUB Exp{
 			$$.reset();
@@ -413,6 +443,17 @@ Exp:	LPAREN Exp RPAREN{
 			else{
 				$$.set_type("BYTE");
 			}
+			string i_type = "i_type";
+			if ($1.get_type()== "BYTE" && $3.get_type()== "BYTE"){
+				i_type = "i8";
+			}
+			else{
+				i_type = "i32";
+			}
+			string* new_place = new string(freshVar());
+			$$.set_place(*new_place);
+			const string my_string3 =  *new_place + " = sub " + i_type + " " + $1.get_place() + ", " + $3.get_place();
+			code_buffer.emit(my_string3);
 		}
 		|ID{
 			$$.reset();
@@ -424,7 +465,8 @@ Exp:	LPAREN Exp RPAREN{
 			}
 			$$.set_enumVal($1.get_id());
 			string type = symbol_table.get_var_type($1.get_id());
-			if (type == "BOOL"){
+			string i_type = "i_type";
+			if (type == "BYTE"){
 				string i_type = "i8";
 			}
 			else if(type == "INT"){
@@ -434,11 +476,13 @@ Exp:	LPAREN Exp RPAREN{
 				output::errorUndef(yylineno, "MESSAGE SEE ENUMS FOR ID DERIVE");
 				exit(0);
 			}
-			int offset = get_offset($1.get_id());
+			int offset = symbol_table.get_offset($1.get_id());
 			string reg1 = freshVar();
-			code_buffer.emit( reg1 + "= getelementptr" + i_type + "i32* %stack i32" + offset);
+			const string my_string1 = reg1 + " = getelementptr i32, i32* %stack, " + i_type + " " + to_string(offset);
+			code_buffer.emit(my_string1);
 			string reg2 = freshVar();
-			code_buffer.emit( reg2 + "= load" + i_type + ", " + i_type + reg1);
+			const string my_string = reg2 + " = load " + i_type + "* " + reg1;
+			code_buffer.emit( my_string);
 			$$.set_place(reg2);
 		}
 		|Call{
@@ -572,10 +616,6 @@ int yyerror(const char * message){
 		exit(0);
 	}
 
-string freshVar(){
-	var_num++;
-	return to_string(var_num);
-}
 
 int main(){
 	int y = yyparse();

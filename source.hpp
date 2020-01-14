@@ -234,7 +234,7 @@ class M{
 	
 public:
 	void set_quad(string& label){
-		quad = new string(label));
+		quad = new string(label);
 	}
 	string& get_quad(){
 		return *quad;
@@ -246,7 +246,7 @@ class N{
 	
 public:
 	void set_next_list(vector<pair<int,BranchLabelIndex>>& list){
-		next_list = new string(list);
+		next_list = new vector<pair<int,BranchLabelIndex>>(list);
 	}
 	vector<pair<int,BranchLabelIndex>>& get_next_list(){
 		return *next_list;
