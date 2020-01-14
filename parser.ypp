@@ -600,7 +600,7 @@ Exp:	LPAREN Exp RPAREN{
 		|LPAREN Type RPAREN Exp {
 			$$.reset();
 			try{
-			if((symbol_table.get_datatype($4.get_enumVal()) != ENUM_VAR) && (symbol_table.get_datatype($4.get_enumVal()) != ENUM_VAL)) {
+			if((symbol_table.get_datatype($4.get_Val()) != ENUM_VAR) && (symbol_table.get_datatype($4.get_Val()) != ENUM_VAL)) {
 				output::errorMismatch(yylineno);
 				exit(0);
 			}
