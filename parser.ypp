@@ -129,10 +129,10 @@ FuncDecl:	RetType {
 					output::errorMismatch(yylineno);
 					exit(0);
 				}
-				if($1.get_type() == "VOID"){
+				if($1.get_type() == "VOID") {
 						code_buffer.emit("ret void");
-						code_buffer.emit("}");
 				}
+				code_buffer.emit("}");
 			}
 ;
 Enums:	/*epsilon*/{}
@@ -377,7 +377,8 @@ Statement:	LBRACE OpenScope Statements CloseScope RBRACE{
 			}
 			|Call SC{
 				$$.set_type("VOID");
-				code_buffer.emit($1.get_place());
+				//OLD VERSION:
+				//code_buffer.emit($1.get_place());
                 /*
                 //LLVM:
                 int next = code_buffer.emit("br label @");
@@ -399,8 +400,6 @@ Statement:	LBRACE OpenScope Statements CloseScope RBRACE{
 				}
 				$$.set_type($2.get_type());
 				code_buffer.emit("ret i32 " + $2.get_place());
-				code_buffer.emit("}");
-
 			}
 			|IF LPAREN BoolExp RPAREN OpenScope M Statement CloseScope {
 				$$.set_type($7.get_type());
@@ -513,8 +512,35 @@ Call:	ID LPAREN ExpList RPAREN{
 					places_list += ", ";
 				}
 			}
+			//OLD VERSION:
+			/*
 			string my_call_string = "call " + return_type + " @" + $1.get_id() + "(" + places_list + ")";
 			$$.set_place(my_call_string);
+			*/
+
+			//NEW VERSION:
+			string str;
+			if (return_type == "void") {
+			    str = "call " + return_type + " @" + $1.get_id() + "(" + places_list + ")";
+			    $$.set_place("NOT SUPPOSED TO BE HERE");
+			 }
+			 else {
+			    string reg = freshVar();
+			    str = reg + " = " + "call " + return_type + " @" + $1.get_id() + "(" + places_list + ")";
+			    $$.set_place(reg);
+			 }
+			 code_buffer.emit(str);
+			/*
+			if (symbol_table.get_func_retType($1.get_id()) == "BOOL") {
+                string str3 = "br i1 " + reg2 + ", label @, label @";
+                int to_patch = code_buffer.emit(str3);
+                vector<pair<int,BranchLabelIndex>> t_list = CodeBuffer::makelist(pair<int,BranchLabelIndex>(to_patch, FIRST));
+                $$.set_true_list(t_list);
+                vector<pair<int,BranchLabelIndex>> f_list = CodeBuffer::makelist(pair<int,BranchLabelIndex>(to_patch, SECOND));
+                $$.set_false_list(f_list);
+            }
+            */
+
 		}
 		|ID LPAREN RPAREN{
 			$$.reset();
@@ -540,7 +566,24 @@ Call:	ID LPAREN ExpList RPAREN{
 			else{
 				return_type = "i32";
 			}
+			//OLD VERSION:
+			/*
 			string my_call_string = "call " + return_type + " @" + $1.get_id() + "()"; //should be in register, then return register??
+			$$.set_place(my_call_string);
+            */
+
+			//NEW VERSION:
+			string str;
+			if (return_type == "void") {
+			    str = "call " + return_type + " @" + $1.get_id() + "()";
+			    $$.set_place("NOT SUPPOSED TO BE HERE");
+			 }
+			 else {
+			    string reg = freshVar();
+			    str = reg + " = " + "call " + return_type + " @" + $1.get_id() + "()";
+			    $$.set_place(reg);
+			 }
+			 code_buffer.emit(str);
 			/*
 			if (symbol_table.get_func_retType($1.get_id()) == "BOOL") {
                 string str3 = "br i1 " + reg2 + ", label @, label @";
@@ -551,7 +594,6 @@ Call:	ID LPAREN ExpList RPAREN{
                 $$.set_false_list(f_list);
             }
             */
-			$$.set_place(my_call_string);
 		}
 ;
 ExpList:	Exp{
@@ -699,9 +741,15 @@ Exp:	LPAREN Exp RPAREN{
 		|Call{
 			$$.reset();
 			$$.set_type($1.get_type());
+			//OLD VERSION:
+			/*
 			string regtemp = freshVar();
 			code_buffer.emit(regtemp + " = " + $1.get_place());
 			$$.set_place(regtemp);
+			*/
+			//NEW VERSION:
+			$$.set_place($1.get_place());
+
 		}
 		|NUM{
 			$$.reset();
@@ -746,7 +794,7 @@ Exp:	LPAREN Exp RPAREN{
 
 			//LLVM:
 			string reg = freshVar();
-			string str1 = reg + " = true"; //is it 1 or true?
+			string str1 = reg + " = 1";
 			int line = code_buffer.emit(str1);
 			string str2 = "br i1 " + reg + ", label @, label @";
 			int to_patch = code_buffer.emit(str2);
@@ -764,7 +812,7 @@ Exp:	LPAREN Exp RPAREN{
 
 			//LLVM:
 			string reg = freshVar();
-			string str1 = reg + " = false"; //is it 0 or false?
+			string str1 = reg + " = 0";
 			int line = code_buffer.emit(str1);
 			string str2 = "br i1 " + reg + ", label @, label @";
 			int to_patch = code_buffer.emit(str2);
@@ -1023,6 +1071,6 @@ int yyerror(const char * message) {
 
 int main() {
 	int y = yyparse();
-	//code_buffer.printCodeBuffer();
+	code_buffer.printCodeBuffer();
 	return y;
 }
