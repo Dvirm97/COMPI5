@@ -424,27 +424,16 @@ Statement:	LBRACE OpenScope Statements CloseScope RBRACE{
                 code_buffer.bpatch($3.get_false_list(), $11.get_quad());
                 code_buffer.bpatch($10.get_next_list(), my_label);
 			}
-			|WHILE M LPAREN BoolExp RPAREN TurnOnWhile OpenScope M Statement N TurnOffWhile CloseScope{
-				$$.set_type($9.get_type());
+			|WHILE N M LPAREN BoolExp RPAREN TurnOnWhile OpenScope M Statement N TurnOffWhile CloseScope{
+				$$.set_type($10.get_type());
 
 				//LLVM:
-				//WITH NEXTLIST:
-				/*
-                int next = code_buffer.emit("br label @");
-                code_buffer.bpatch($4.get_true_list(), $8.get_quad());
-                code_buffer.bpatch($10.get_next_list(), $2.get_quad());
-                code_buffer.bpatch($9.get_next_list(), $2.get_quad());
-                vector<pair<int,BranchLabelIndex>> temp1 = CodeBuffer::makelist(pair<int,BranchLabelIndex>(next, FIRST));
-                vector<pair<int,BranchLabelIndex>> merged_list = CodeBuffer::merge($4.get_false_list(), temp1);
-                $$.set_next_list(merged_list);
-                */
-
                 //WITHOUT NEXTLIST:
                 string my_label = code_buffer.genLabel();
-                code_buffer.bpatch($4.get_true_list(), $8.get_quad());
-                code_buffer.bpatch($4.get_false_list(), my_label);
-                code_buffer.bpatch($10.get_next_list(), $2.get_quad());
-                //code_buffer.bpatch($9.get_next_list(), $2.get_quad());
+                code_buffer.bpatch($2.get_next_list(), $3.get_quad());
+                code_buffer.bpatch($5.get_true_list(), $9.get_quad());
+                code_buffer.bpatch($5.get_false_list(), my_label);
+                code_buffer.bpatch($11.get_next_list(), $3.get_quad());
 
 			}
 			|BREAK SC {
