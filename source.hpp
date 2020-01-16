@@ -100,6 +100,8 @@ public:
 class Exp: public Type{
 	string* value;
 	string* place;
+    vector<pair<int,BranchLabelIndex>>* true_list;
+    vector<pair<int,BranchLabelIndex>>* false_list;
 public:
 	void set_Val(const string& Val){
         value = new string(Val);
@@ -113,36 +115,31 @@ public:
 	string& get_place() const{
 		return *place;
 	}
-	void reset(){
+	void reset() {
 		value = new string();
 		place = new string();
+        true_list = new vector<pair<int,BranchLabelIndex>>();
+        false_list = new vector<pair<int,BranchLabelIndex>>();
 	}
+
+    void set_true_list(vector<pair<int,BranchLabelIndex>>& item) {
+        true_list = new vector<pair<int,BranchLabelIndex>>(item);
+    }
+    void set_false_list(vector<pair<int,BranchLabelIndex>>& item) {
+        false_list = new vector<pair<int,BranchLabelIndex>>(item);
+    }
+    vector<pair<int,BranchLabelIndex>>& get_true_list() {
+        return *true_list;
+    }
+    vector<pair<int,BranchLabelIndex>>& get_false_list() {
+        return *false_list;
+    }
+	friend class BoolExp;
 };
 
 class Call: public Exp{};
 
-class BoolExp: public Exp{
-    vector<pair<int,BranchLabelIndex>>* true_list;
-    vector<pair<int,BranchLabelIndex>>* false_list;
-public:
-    void set_true_list(vector<pair<int,BranchLabelIndex>>& item){
-        true_list = new vector<pair<int,BranchLabelIndex>>(item);
-    }
-    void set_false_list(vector<pair<int,BranchLabelIndex>>& item){
-        false_list = new vector<pair<int,BranchLabelIndex>>(item);
-    }
-    vector<pair<int,BranchLabelIndex>>& get_true_list(){
-        return *true_list;
-    }
-    vector<pair<int,BranchLabelIndex>>& get_false_list(){
-        return *false_list;
-    }
-    void BoolExp_reset(){
-        reset();
-        true_list = new vector<pair<int,BranchLabelIndex>>();
-        false_list = new vector<pair<int,BranchLabelIndex>>();
-    }
-};
+class BoolExp: public Exp{};
 
 class Enumerator: public Id{};
 
