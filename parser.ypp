@@ -500,17 +500,6 @@ Call:	ID LPAREN ExpList RPAREN{
 			    $$.set_place(reg);
 			 }
 			 code_buffer.emit(str);
-			/*
-			if (symbol_table.get_func_retType($1.get_id()) == "BOOL") {
-                string str3 = "br i1 " + reg2 + ", label @, label @";
-                int to_patch = code_buffer.emit(str3);
-                vector<pair<int,BranchLabelIndex>> t_list = CodeBuffer::makelist(pair<int,BranchLabelIndex>(to_patch, FIRST));
-                $$.set_true_list(t_list);
-                vector<pair<int,BranchLabelIndex>> f_list = CodeBuffer::makelist(pair<int,BranchLabelIndex>(to_patch, SECOND));
-                $$.set_false_list(f_list);
-            }
-            */
-
 		}
 		|ID LPAREN RPAREN{
 			$$.reset();
@@ -765,10 +754,7 @@ Exp:	LPAREN Exp RPAREN{
 			$$.set_type("BOOL");
 
 			//LLVM:
-			string reg = freshVar();
-			string str1 = reg + " = 1";
-			int line = code_buffer.emit(str1);
-            $$.set_place(reg);
+            $$.set_place("1");
 
 		}
 		|FALSE {
@@ -776,10 +762,7 @@ Exp:	LPAREN Exp RPAREN{
 			$$.set_type("BOOL");
 
 			//LLVM:
-			string reg = freshVar();
-			string str1 = reg + " = 0";
-			int line = code_buffer.emit(str1);
-            $$.set_place(reg);
+            $$.set_place("0");
 
 		}
 		|NOT Exp {
@@ -1049,6 +1032,6 @@ int yyerror(const char * message) {
 
 int main() {
 	int y = yyparse();
-	//code_buffer.printCodeBuffer();
+	code_buffer.printCodeBuffer();
 	return y;
 }
