@@ -118,14 +118,17 @@ public:
 	void reset() {
 		value = new string();
 		place = new string();
-        true_list = new vector<pair<int,BranchLabelIndex>>();
-        false_list = new vector<pair<int,BranchLabelIndex>>();
+        true_list = new vector<pair<int,BranchLabelIndex>>(0);
+        false_list = new vector<pair<int,BranchLabelIndex>>(0);
 	}
 
     void set_true_list(vector<pair<int,BranchLabelIndex>>& item) {
+	    delete true_list;
         true_list = new vector<pair<int,BranchLabelIndex>>(item);
+
     }
     void set_false_list(vector<pair<int,BranchLabelIndex>>& item) {
+        delete false_list;
         false_list = new vector<pair<int,BranchLabelIndex>>(item);
     }
     vector<pair<int,BranchLabelIndex>>& get_true_list() {

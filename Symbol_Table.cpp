@@ -307,6 +307,7 @@ void  Symbol_Table::openScope() {
 }
 
 void  Symbol_Table::closeScope() {
+    /*
     output::endScope();
     list<table_elem>* cur_scope = tables->front();
     list<table_elem>::reverse_iterator elem_it;
@@ -333,6 +334,7 @@ void  Symbol_Table::closeScope() {
             output::printEnumType((*elem_it).name, (*elem_it).params_type);
         }
     }
+    */
     if (tables->empty() || offsets->empty())
         throw ST_empty();
     tables->pop_front();
