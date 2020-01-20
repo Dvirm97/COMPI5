@@ -271,6 +271,18 @@ public:
     }
 };
 
+class My_String{
+	string* constante;
+	
+public: 
+	void set_value(const string& value){
+		constante = new string(value);
+	}
+	string& get_value(){
+		return *constante;
+	}
+};
+
 union STYPE
 {
     Type type;
@@ -291,6 +303,7 @@ union STYPE
     EnumeratorList enumerator_list;
     M m;
     N n;
+	My_String my_string;
 } ;
 
 #define YYSTYPE STYPE

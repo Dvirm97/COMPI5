@@ -7,6 +7,7 @@
 	using namespace std;
 
 	int var_num = 0;
+	int string_num = 0;
 	extern int yylineno;
 	extern int yylex();
 	int yyerror(const char * message);
@@ -19,6 +20,11 @@
 		var_num++;
 		return ("%r" + to_string(var_num));
 	}
+	string freshNum(){
+		string_num++;
+		return to_string(string_num);
+	}
+	
 
 %}
 
@@ -35,9 +41,10 @@
 %left BINOP_SUB
 %right NOT
 %left LPAREN RPAREN LBRACE RBRACE
-%nonassoc IF WHILE RETURN BREAK CONTINUE INT BYTE BOOL STRING B ENUM SC VOID TRUE FALSE COMMA
+%nonassoc IF WHILE RETURN BREAK CONTINUE INT BYTE BOOL B ENUM SC VOID TRUE FALSE COMMA
 %nonassoc<id> ID
 %nonassoc<num> NUM
+%nonassoc<my_string> STRING
 %right ELSE
 
 %type<ret_type> RetType
@@ -212,12 +219,14 @@ Statements:	Statement {
                 $$.set_continue_list(c_list);
 			}
 ;
-Statement:	LBRACE OpenScope Statements CloseScope RBRACE{
-				$$.set_type($3.get_type());
+
+Statement:	LBRACE OpenScope {code_buffer.emit("{");} Statements CloseScope RBRACE{
+				$$.set_type($4.get_type());
 
                 //LLVM:
-                $$.set_break_list($3.get_break_list());
-                $$.set_continue_list($3.get_continue_list());
+                $$.set_break_list($4.get_break_list());
+                $$.set_continue_list($4.get_continue_list());
+				code_buffer.emit("}");
 			}
 			|Type ID SC{
 				try{
@@ -226,10 +235,16 @@ Statement:	LBRACE OpenScope Statements CloseScope RBRACE{
 					output::errorDef(yylineno, e.get_raised_id());
 					exit(0);
 				}
-				$$.set_type("VOID");
 
                 //LLVM:
-                $$.reset();
+				$$.reset();
+				$$.set_type("VOID");
+				int offset = symbol_table.get_offset($2.get_id());
+				string reg1 = freshVar();
+				string str1 = reg1 + " = getelementptr i32, i32* %stack, i32 " + to_string(offset);
+				code_buffer.emit(str1);
+				string str2 = "store i32 0, i32* " + reg1;
+				code_buffer.emit(str2);
 			}
 			|EnumType ID SC{
 				try{
@@ -243,12 +258,20 @@ Statement:	LBRACE OpenScope Statements CloseScope RBRACE{
 					output::errorDef(yylineno, e.get_raised_id());
 					exit(0);
 				}
-				$$.set_type("VOID");
 
                 //LLVM:
                 $$.reset();
+				$$.set_type("VOID");
+				int offset = symbol_table.get_offset($2.get_id());
+				string reg1 = freshVar();
+				string str1 = reg1 + " = getelementptr i32, i32* %stack, i32 " + to_string(offset);
+				code_buffer.emit(str1);
+				string str2 = "store i32 0, i32* " + reg1;
+				code_buffer.emit(str2);
 			}
 			|EnumDecl{
+                //LLVM:
+                $$.reset();
 				$$.set_type("VOID");
 
                 //LLVM:
@@ -266,6 +289,9 @@ Statement:	LBRACE OpenScope Statements CloseScope RBRACE{
 					output::errorDef(yylineno, e.get_raised_id());
 					exit(0);
 				}
+
+				//LLVM:
+				$$.reset();
 				$$.set_type("VOID");
 
 				//LLVM:
@@ -320,11 +346,17 @@ Statement:	LBRACE OpenScope Statements CloseScope RBRACE{
 					output::errorUndefEnumValue(yylineno, $2.get_id());
 					exit(0);
 				}
-				$$.set_type("VOID");
 
                 //LLVM:
                 $$.reset();
-				
+				$$.set_type("VOID");
+				int offset = symbol_table.get_offset($2.get_id());
+				string reg1 = freshVar();
+				string str1 = reg1 + " = getelementptr i32, i32* %stack, i32 " + to_string(offset);
+				code_buffer.emit(str1);
+				int enum_value = symbol_table.enum_to_num($4.get_Val());
+				string str2 = "store i32 " + to_string(enum_value) + ", i32* " + reg1;
+				code_buffer.emit(str2);
 			}
 			|ID ASSIGN Exp SC{
 				try{
@@ -347,6 +379,9 @@ Statement:	LBRACE OpenScope Statements CloseScope RBRACE{
 					output::errorUndef(yylineno,e.get_raised_id());
 					exit(0);
 				}
+
+				//LLVM:
+				$$.reset();
 				$$.set_type("VOID");
 
 				//LLVM:
@@ -382,20 +417,21 @@ Statement:	LBRACE OpenScope Statements CloseScope RBRACE{
 				}
 			}
 			|Call SC{
-				$$.set_type("VOID");
 
 				//LLVM:
 				$$.reset();
+				$$.set_type("VOID");
 			}
 			|RETURN SC{
 				if (RetType_flag != "VOID"){
 					output::errorMismatch(yylineno);
 					exit(0);
 				}
-				$$.set_type("VOID");
 
 				//LLVM:
 				$$.reset();
+				$$.set_type("VOID");
+
 			}
 			|RETURN Exp SC{
 				if ((RetType_flag != $2.get_type() && !( RetType_flag == "INT" && $2.get_type() == "BYTE")) || $2.get_type() == "VOID"){
@@ -517,9 +553,16 @@ Call:	ID LPAREN ExpList RPAREN{
 			else{
 				return_type = "i32";
 			}
+			string type_of_param = "";
+			if ($1.get_id()== "print"){
+				type_of_param = "i8*";
+			}
+			else{
+				type_of_param = "i32";
+			}
 			string places_list = "";
 			for (int i = 0; i < exp_list.size(); i++ ) {
-				places_list += "i32 " + exp_list[i].get_place();
+				places_list += type_of_param + " " + exp_list[i].get_place();
 				if (i < exp_list.size() - 1){
 					places_list += ", ";
 				}
@@ -675,9 +718,9 @@ Exp:	LPAREN Exp RPAREN{
 			else{
 				$$.set_type("BYTE");
 			}
-			string* new_place = new string(freshVar());
-			$$.set_place(*new_place);
-			const string my_string3 =  *new_place + " = mul i32 " + $1.get_place() + ", " + $3.get_place();
+			string new_place = freshVar();
+			$$.set_place(new_place);
+			const string my_string3 =  new_place + " = mul i32 " + $1.get_place() + ", " + $3.get_place();
 			code_buffer.emit(my_string3);
 		}
 		|Exp BINOP_DIV Exp{
@@ -722,9 +765,9 @@ Exp:	LPAREN Exp RPAREN{
 			else{
 				$$.set_type("BYTE");
 			}
-			string* new_place = new string(freshVar());
-			$$.set_place(*new_place);
-			const string my_string3 =  *new_place + " = add i32 " + $1.get_place() + ", " + $3.get_place();
+			string new_place = freshVar();
+			$$.set_place(new_place);
+			const string my_string3 =  new_place + " = add i32 " + $1.get_place() + ", " + $3.get_place();
 			code_buffer.emit(my_string3);
 		}
 		|Exp BINOP_SUB Exp{
@@ -739,9 +782,9 @@ Exp:	LPAREN Exp RPAREN{
 			else{
 				$$.set_type("BYTE");
 			}
-			string* new_place = new string(freshVar());
-			$$.set_place(*new_place);
-			const string my_string3 =  *new_place + " = sub i32 " + $1.get_place() + ", " + $3.get_place();
+			string new_place = freshVar();
+			$$.set_place(new_place);
+			const string my_string3 =  new_place + " = sub i32 " + $1.get_place() + ", " + $3.get_place();
 			code_buffer.emit(my_string3);
 		}
 		|ID{
@@ -814,6 +857,9 @@ Exp:	LPAREN Exp RPAREN{
 		|STRING {
 			$$.reset();
 			$$.set_type("STRING");
+			string new_num = freshNum();
+			code_buffer.emitGlobal("@.str" + new_num + " = constant [" + to_string($1.get_value().size()) + " x i8] c" + $1.get_value());
+			$$.set_place("@.str" + new_num);
 		}
 		|LPAREN Type RPAREN Exp {
 			$$.reset();
@@ -831,6 +877,7 @@ Exp:	LPAREN Exp RPAREN{
          		exit(0);
 			}
 			$$.set_type("INT");
+			$$.set_place($4.get_place());
 		}
 		|TRUE {
 			$$.reset();
@@ -1062,7 +1109,16 @@ InsertFunc:	/*epsilon*/ {
 				//LLVM:
 				code_buffer.emitGlobal("declare i32 @printf(i8, ...)");
 				code_buffer.emitGlobal("declare void @exit(i32)");
-
+				code_buffer.emitGlobal("@.str_specifier = constant [4 x i8] c\"%s\\0A\\00\"");
+				code_buffer.emitGlobal("@.int_specifier = constant [4 x i8] c\"%d\\0A\\00\"");
+				code_buffer.emitGlobal("define void @printi(i32 %0) {");
+				code_buffer.emitGlobal("call i32 (i8*, ...) @printf(i8* getelementptr ([4 x i8], [4 x i8]* @.int_specifier, i32 0, i32 0), i32 %0)");
+				code_buffer.emitGlobal("ret void");
+				code_buffer.emitGlobal("}");
+				code_buffer.emitGlobal("define void @print(i8* %0) {");
+				code_buffer.emitGlobal("call i32 (i8*, ...) @printf(i8* getelementptr ([4 x i8], [4 x i8]* @.str_specifier, i32 0, i32 0), i8* %0)");
+				code_buffer.emitGlobal("ret void");
+				code_buffer.emitGlobal("}");
 			}
 ;
 OpenScope: /*epsilon*/ {
