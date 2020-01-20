@@ -858,9 +858,9 @@ Exp:	LPAREN Exp RPAREN{
 			$$.reset();
 			$$.set_type("STRING");
 			string new_num = freshNum();
-			code_buffer.emitGlobal("@.str" + new_num + " = constant [" + to_string($1.get_value().size()) + " x i8] c" + $1.get_value());
+			code_buffer.emitGlobal("@.str" + new_num + " = constant [" + to_string($1.get_value().size() - 1) + " x i8] c" + $1.get_value().substr(0,$1.get_value().size() - 1) + "\\00\"");
 			string register_that_keep_the_value = freshVar();
-			code_buffer.emitGlobal(register_that_keep_the_value + " = getelementptr inbounds [" + to_string($1.get_value().size()) + " x i8], " + "[" + to_string($1.get_value().size()) + " x i8]* @.str" + new_num + ", i32 0, i32 0");
+			code_buffer.emitGlobal(register_that_keep_the_value + " = getelementptr [" + to_string($1.get_value().size() - 1) + " x i8], [" + to_string($1.get_value().size() - 1) + " x i8]* @.str" + new_num + ", i32 0, i32 0");
 			$$.set_place(register_that_keep_the_value);
 		}
 		|LPAREN Type RPAREN Exp {
@@ -1111,14 +1111,13 @@ InsertFunc:	/*epsilon*/ {
 				//LLVM:
 				code_buffer.emitGlobal("declare i32 @printf(i8*, ...)");
 				code_buffer.emitGlobal("declare void @exit(i32)");
-				code_buffer.emitGlobal("@.int_specifier = constant [4 x i8] c\"%d\0A\00");
-				code_buffer.emitGlobal("@.str_specifier = constant [4 x i8] c\"%s\0A\00");
+				code_buffer.emitGlobal("@.int_specifier = constant [4 x i8] c\"%d\\0A\\00\"");
 				code_buffer.emitGlobal("define void @printi(i32) {");
 				code_buffer.emitGlobal("call i32 (i8*, ...) @printf(i8* getelementptr ([4 x i8], [4 x i8]* @.int_specifier, i32 0, i32 0), i32 %0)");
 				code_buffer.emitGlobal("ret void");
 				code_buffer.emitGlobal("}");
-				code_buffer.emitGlobal("define void @print(i8* %0) {");
-				code_buffer.emitGlobal("call i32 (i8*, ...) @printf(i8* getelementptr ([4 x i8], [4 x i8]* @.str_specifier, i32 0, i32 0), i8* %0)");
+				code_buffer.emitGlobal("define void @print(i8*) {");
+				code_buffer.emitGlobal("call i32 (i8*, ...) @printf(i8* %0)");
 				code_buffer.emitGlobal("ret void");
 				code_buffer.emitGlobal("}");
 			}
