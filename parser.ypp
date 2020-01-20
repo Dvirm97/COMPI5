@@ -718,10 +718,20 @@ Exp:	LPAREN Exp RPAREN{
 			else{
 				$$.set_type("BYTE");
 			}
-			string new_place = freshVar();
-			$$.set_place(new_place);
-			const string my_string3 =  new_place + " = mul i32 " + $1.get_place() + ", " + $3.get_place();
-			code_buffer.emit(my_string3);
+			string reg = freshVar();
+			string str =  reg + " = mul i32 " + $1.get_place() + ", " + $3.get_place();
+			code_buffer.emit(str);
+			if ($1.get_type() == "BYTE" && $3.get_type() == "BYTE") {
+			    string reg2 = freshVar();
+			    string str2 = reg2 + " = trunc i32 " + reg + " to i8";
+			    code_buffer.emit(str2);
+			    string reg3 = freshVar();
+			    string str3 = reg3 + " = zext i8 " + reg2 + " to i32";
+			    code_buffer.emit(str3);
+			    $$.set_place(reg3);
+			}
+			else
+			    $$.set_place(reg);
 		}
 		|Exp BINOP_DIV Exp{
 			$$.reset();
@@ -741,6 +751,8 @@ Exp:	LPAREN Exp RPAREN{
 			vector<pair<int,BranchLabelIndex>> list_exit = CodeBuffer::makelist(pair<int,BranchLabelIndex>(bp_address, FIRST));
 			vector<pair<int,BranchLabelIndex>> list_next = CodeBuffer::makelist(pair<int,BranchLabelIndex>(bp_address, SECOND));
 			string label_exit = code_buffer.genLabel();
+			code_buffer.emitGlobal("@.div_by_0 = constant [22 x i8] c\"Error division by zero\\00\"");
+			code_buffer.emit("call void @print(i8* @.div_by_0)"); //we can do this at the start aswell if we want to
 			code_buffer.emit("call void @exit(i32 1)");
 			int to_patch = code_buffer.emit("br label @");
 			vector<pair<int,BranchLabelIndex>> list_redundant = CodeBuffer::makelist(pair<int,BranchLabelIndex>(to_patch, FIRST));
@@ -748,10 +760,20 @@ Exp:	LPAREN Exp RPAREN{
 			code_buffer.bpatch(list_exit, label_exit);
 			code_buffer.bpatch(list_next, my_label);
 			code_buffer.bpatch(list_redundant, my_label);
-			string new_place = freshVar();
-			$$.set_place(new_place);
-			string my_string3 =  new_place + " = sdiv i32 " + $1.get_place() + ", " + $3.get_place();
-			code_buffer.emit(my_string3);
+			string reg = freshVar();
+			string str =  reg + " = sdiv i32 " + $1.get_place() + ", " + $3.get_place();
+			code_buffer.emit(str);
+			if ($1.get_type() == "BYTE" && $3.get_type() == "BYTE") {
+			    string reg2 = freshVar();
+			    string str2 = reg2 + " = trunc i32 " + reg + " to i8";
+			    code_buffer.emit(str2);
+			    string reg3 = freshVar();
+			    string str3 = reg3 + " = zext i8 " + reg2 + " to i32";
+			    code_buffer.emit(str3);
+			    $$.set_place(reg3);
+			}
+			else
+			    $$.set_place(reg);
 		}
 		|Exp BINOP_ADD Exp{
 			$$.reset();
@@ -765,10 +787,20 @@ Exp:	LPAREN Exp RPAREN{
 			else{
 				$$.set_type("BYTE");
 			}
-			string new_place = freshVar();
-			$$.set_place(new_place);
-			const string my_string3 =  new_place + " = add i32 " + $1.get_place() + ", " + $3.get_place();
-			code_buffer.emit(my_string3);
+			string reg = freshVar();
+			string str =  reg + " = add i32 " + $1.get_place() + ", " + $3.get_place();
+			code_buffer.emit(str);
+			if ($1.get_type() == "BYTE" && $3.get_type() == "BYTE") {
+			    string reg2 = freshVar();
+			    string str2 = reg2 + " = trunc i32 " + reg + " to i8";
+			    code_buffer.emit(str2);
+			    string reg3 = freshVar();
+			    string str3 = reg3 + " = zext i8 " + reg2 + " to i32";
+			    code_buffer.emit(str3);
+			    $$.set_place(reg3);
+			}
+			else
+			    $$.set_place(reg);
 		}
 		|Exp BINOP_SUB Exp{
 			$$.reset();
@@ -782,10 +814,20 @@ Exp:	LPAREN Exp RPAREN{
 			else{
 				$$.set_type("BYTE");
 			}
-			string new_place = freshVar();
-			$$.set_place(new_place);
-			const string my_string3 =  new_place + " = sub i32 " + $1.get_place() + ", " + $3.get_place();
-			code_buffer.emit(my_string3);
+			string reg = freshVar();
+			string str =  reg + " = sub i32 " + $1.get_place() + ", " + $3.get_place();
+			code_buffer.emit(str);
+			if ($1.get_type() == "BYTE" && $3.get_type() == "BYTE") {
+			    string reg2 = freshVar();
+			    string str2 = reg2 + " = trunc i32 " + reg + " to i8";
+			    code_buffer.emit(str2);
+			    string reg3 = freshVar();
+			    string str3 = reg3 + " = zext i8 " + reg2 + " to i32";
+			    code_buffer.emit(str3);
+			    $$.set_place(reg3);
+			}
+			else
+			    $$.set_place(reg);
 		}
 		|ID{
 			$$.reset();
@@ -1168,5 +1210,6 @@ int main() {
 	int y = yyparse();
 	code_buffer.printGlobalBuffer();
 	code_buffer.printCodeBuffer();
+	cout << "@.div_by_0 = constant [22 x i8] c\"Error division by zero\"" << endl;
 	return y;
 }
