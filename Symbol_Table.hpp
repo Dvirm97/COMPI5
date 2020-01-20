@@ -99,6 +99,9 @@ public:
     //returns id's offset:
     int get_offset(const string& id);
 
+    //returns an enum value's corresponding int value:
+    int enum_to_num(const string& val);
+
 
 
 

@@ -377,3 +377,31 @@ int Symbol_Table::get_offset(const string& id) {
     }
     throw ST_undef(id);
 }
+
+int Symbol_Table::enum_to_num(const string& val) {
+    try{
+        string enum_type = get_var_type(val);
+        list < list<table_elem>* > :: iterator scope_it;
+        list <table_elem> :: iterator elem_it;
+        list<table_elem>* cur_scope;
+        int counter = 0;
+        //checking for existence
+        for (scope_it = tables->begin(); scope_it!=tables->end(); scope_it++) {
+            cur_scope = *scope_it;
+            for (elem_it = cur_scope->begin(); elem_it!=cur_scope->end(); elem_it++) {
+                if ((*elem_it).name == enum_type) {
+                    vector<string> :: iterator values_it;
+                    values_it = (*elem_it).params_type.begin();
+                    for (values_it = (*elem_it).params_type.begin(); values_it != (*elem_it).params_type.end(); values_it++) {
+                        if ((*values_it) == val)
+                            return counter;
+                        counter++;
+                    }
+                    return -1;
+                }
+            }
+        }
+    }catch (ST_undef& e){
+        throw ST_undefEnumValue(val);
+    }
+}
