@@ -1060,8 +1060,9 @@ InsertFunc:	/*epsilon*/ {
 				symbol_table.insertFunc("printi", "VOID", param2);
 
 				//LLVM:
-				code_buffer.emit("declare i32 @printf(i8, ...)");
-				code_buffer.emit("declare void @exit(i32)");
+				code_buffer.emitGlobal("declare i32 @printf(i8, ...)");
+				code_buffer.emitGlobal("declare void @exit(i32)");
+
 			}
 ;
 OpenScope: /*epsilon*/ {
@@ -1108,6 +1109,7 @@ int yyerror(const char * message) {
 
 int main() {
 	int y = yyparse();
+	code_buffer.printGlobalBuffer();
 	code_buffer.printCodeBuffer();
 	return y;
 }
