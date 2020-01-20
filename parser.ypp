@@ -7,6 +7,7 @@
 	using namespace std;
 
 	int var_num = 0;
+	int string_num = 0;
 	extern int yylineno;
 	extern int yylex();
 	int yyerror(const char * message);
@@ -19,6 +20,11 @@
 		var_num++;
 		return ("%r" + to_string(var_num));
 	}
+	string freshNum(){
+		string_num++;
+		return to_string(string_num);
+	}
+	
 
 %}
 
@@ -35,9 +41,10 @@
 %left BINOP_SUB
 %right NOT
 %left LPAREN RPAREN LBRACE RBRACE
-%nonassoc IF WHILE RETURN BREAK CONTINUE INT BYTE BOOL STRING B ENUM SC VOID TRUE FALSE COMMA
+%nonassoc IF WHILE RETURN BREAK CONTINUE INT BYTE BOOL B ENUM SC VOID TRUE FALSE COMMA
 %nonassoc<id> ID
 %nonassoc<num> NUM
+%nonassoc<my_string> STRING
 %right ELSE
 
 %type<ret_type> RetType
@@ -341,8 +348,7 @@ Statement:	LBRACE OpenScope {code_buffer.emit("{");} Statements CloseScope RBRAC
 				string reg1 = freshVar();
 				string str1 = reg1 + " = getelementptr i32, i32* %stack, i32 " + to_string(offset);
 				code_buffer.emit(str1);
-				//int enum_value = symbol_table.get_order_of_enum($4.get_Val());
-				int enum_value = 0;
+				int enum_value = symbol_table.enum_to_num($4.get_Val());
 				string str2 = "store i32 " + to_string(enum_value) + ", i32* " + reg1;
 				code_buffer.emit(str2);
 			}
@@ -539,9 +545,16 @@ Call:	ID LPAREN ExpList RPAREN{
 			else{
 				return_type = "i32";
 			}
+			string type_of_param = "";
+			if ($1.get_id()== "print"){
+				type_of_param = "i8*";
+			}
+			else{
+				type_of_param = "i32";
+			}
 			string places_list = "";
 			for (int i = 0; i < exp_list.size(); i++ ) {
-				places_list += "i32 " + exp_list[i].get_place();
+				places_list += type_of_param + " " + exp_list[i].get_place();
 				if (i < exp_list.size() - 1){
 					places_list += ", ";
 				}
@@ -684,7 +697,6 @@ Exp:	LPAREN Exp RPAREN{
 			    $$.set_place($2.get_place());
 			$$.set_true_list($2.get_true_list());
 			$$.set_false_list($2.get_false_list());
-			//TODO : why we do set place just for not booleans ?
 		}
 		|Exp BINOP_MUL Exp{
 			$$.reset();
@@ -837,6 +849,9 @@ Exp:	LPAREN Exp RPAREN{
 		|STRING {
 			$$.reset();
 			$$.set_type("STRING");
+			string new_num = freshNum();
+			code_buffer.emitGlobal("@.str" + new_num + " = constant [" + to_string($1.get_value().size()) + " x i8] c" + $1.get_value());
+			$$.set_place("@.str" + new_num);
 		}
 		|LPAREN Type RPAREN Exp {
 			$$.reset();
@@ -1086,11 +1101,13 @@ InsertFunc:	/*epsilon*/ {
 				//LLVM:
 				code_buffer.emitGlobal("declare i32 @printf(i8, ...)");
 				code_buffer.emitGlobal("declare void @exit(i32)");
-				code_buffer.emitGlobal("define void @printi(i32) {");
+				code_buffer.emitGlobal("@.str_specifier = constant [4 x i8] c\"%s\\0A\\00\"");
+				code_buffer.emitGlobal("@.int_specifier = constant [4 x i8] c\"%d\\0A\\00\"");
+				code_buffer.emitGlobal("define void @printi(i32 %0) {");
 				code_buffer.emitGlobal("call i32 (i8*, ...) @printf(i8* getelementptr ([4 x i8], [4 x i8]* @.int_specifier, i32 0, i32 0), i32 %0)");
 				code_buffer.emitGlobal("ret void");
 				code_buffer.emitGlobal("}");
-				code_buffer.emitGlobal("define void @print(i8*) {");
+				code_buffer.emitGlobal("define void @print(i8* %0) {");
 				code_buffer.emitGlobal("call i32 (i8*, ...) @printf(i8* getelementptr ([4 x i8], [4 x i8]* @.str_specifier, i32 0, i32 0), i8* %0)");
 				code_buffer.emitGlobal("ret void");
 				code_buffer.emitGlobal("}");

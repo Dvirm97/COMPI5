@@ -54,7 +54,10 @@ continue                                          return CONTINUE;
 													yylval.num.set_num(string(yytext));
 												    return NUM;
 												  }
-\"([^\n\r\"\\]|\\[rnt"\\])+\"                     return STRING; 
+\"([^\n\r\"\\]|\\[rnt"\\])+\"                     {	
+													yylval.my_string.set_value(string(yytext));
+													return STRING;
+												  } 
 
 "//"[^\r\n]*[\r|\n|\r\n]?
 [\x0D\x09\x20\x0A]
