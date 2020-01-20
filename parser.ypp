@@ -11,13 +11,13 @@
 	extern int yylex();
 	int yyerror(const char * message);
 	Symbol_Table symbol_table;
-	bool while_flag;
+	int while_flag;
 	string RetType_flag;
 	CodeBuffer& code_buffer = CodeBuffer::instance();
 
 	string freshVar() {
 		var_num++;
-		return ("%" + to_string(var_num));
+		return ("%r" + to_string(var_num));
 	}
 
 %}
@@ -129,10 +129,10 @@ FuncDecl:	RetType {
 					output::errorMismatch(yylineno);
 					exit(0);
 				}
-				if($1.get_type() == "VOID"){
+				if($1.get_type() == "VOID") {
 						code_buffer.emit("ret void");
-						code_buffer.emit("}");
 				}
+				code_buffer.emit("}");
 			}
 ;
 Enums:	/*epsilon*/{}
@@ -194,15 +194,31 @@ Enumerator: ID{
 				$$.set_id($1.get_id());
 			}
 ;
-Statements:	Statement{
+Statements:	Statement {
 				$$.set_type($1.get_type());
+
+                //LLVM:
+                $$.set_break_list($1.get_break_list());
+                $$.set_continue_list($1.get_continue_list());
+
 			}
-			|Statements Statement{
+			|Statements Statement {
 				$$.set_type2($1.get_type(), $2.get_type());
+
+				//LLVM:
+				vector<pair<int,BranchLabelIndex>> b_list = CodeBuffer::merge($1.get_break_list(), $2.get_break_list());
+				vector<pair<int,BranchLabelIndex>> c_list = CodeBuffer::merge($1.get_continue_list(), $2.get_continue_list());
+                $$.set_break_list(b_list);
+                $$.set_continue_list(c_list);
 			}
 ;
-Statement:	LBRACE OpenScope Statements CloseScope RBRACE{
-				$$.set_type($3.get_type());
+Statement:	LBRACE OpenScope {code_buffer.emit("{");} Statements CloseScope RBRACE{
+				$$.set_type($4.get_type());
+
+                //LLVM:
+                $$.set_break_list($4.get_break_list());
+                $$.set_continue_list($4.get_continue_list());
+				code_buffer.emit("}");
 			}
 			|Type ID SC{
 				try{
@@ -211,7 +227,17 @@ Statement:	LBRACE OpenScope Statements CloseScope RBRACE{
 					output::errorDef(yylineno, e.get_raised_id());
 					exit(0);
 				}
+
+                //LLVM:
+				$$.reset();
 				$$.set_type("VOID");
+				int offset = symbol_table.get_offset($2.get_id());
+				string reg1 = freshVar();
+				string str1 = reg1 + " = getelementptr i32, i32* %stack, i32 " + to_string(offset);
+				code_buffer.emit(str1);
+				string str2 = "store i32 0, i32* " + reg1;
+				code_buffer.emit(str2);
+				
 			}
 			|EnumType ID SC{
 				try{
@@ -225,12 +251,24 @@ Statement:	LBRACE OpenScope Statements CloseScope RBRACE{
 					output::errorDef(yylineno, e.get_raised_id());
 					exit(0);
 				}
+
+                //LLVM:
+                $$.reset();
 				$$.set_type("VOID");
+				int offset = symbol_table.get_offset($2.get_id());
+				string reg1 = freshVar();
+				string str1 = reg1 + " = getelementptr i32, i32* %stack, i32 " + to_string(offset);
+				code_buffer.emit(str1);
+				string str2 = "store i32 0, i32* " + reg1;
+				code_buffer.emit(str2);
 			}
 			|EnumDecl{
+                //LLVM:
+                $$.reset();
 				$$.set_type("VOID");
 			}
 			|Type ID ASSIGN Exp SC{
+
 				if ($1.get_type()!=$4.get_type() && !($4.get_type() == "BYTE" && $1.get_type() == "INT")){
 					output::errorMismatch(yylineno);
 					exit(0);
@@ -241,23 +279,40 @@ Statement:	LBRACE OpenScope Statements CloseScope RBRACE{
 					output::errorDef(yylineno, e.get_raised_id());
 					exit(0);
 				}
+
+				//LLVM:
+				$$.reset();
 				$$.set_type("VOID");
 				int offset = symbol_table.get_offset($2.get_id());
 				string reg1 = freshVar();
-				const string my_string1 = reg1 + " = getelementptr i32, i32* %stack, i32 " + to_string(offset);
-				code_buffer.emit(my_string1);
-				const string my_string2 = "store i32 " + $4.get_place() + ", i32* " + reg1;
-				code_buffer.emit(my_string2);
+				string str1 = reg1 + " = getelementptr i32, i32* %stack, i32 " + to_string(offset);
+				if ($1.get_type() != "BOOL") {
+                    code_buffer.emit(str1);
+                    string str2 = "store i32 " + $4.get_place() + ", i32* " + reg1;
+                    code_buffer.emit(str2);
+				}
+				else {
+				    string t_label = code_buffer.genLabel();
+				    code_buffer.emit(str1);
+                    string t_str = "store i32 1, i32* " + reg1;
+                    code_buffer.emit(t_str);
+                    int to_patch1 = code_buffer.emit("br label @");
+				    string f_label = code_buffer.genLabel();
+				    string reg2 = freshVar();
+				    string str2 = reg2 + " = getelementptr i32, i32* %stack, i32 " + to_string(offset);
+				    code_buffer.emit(str2);
+                    string f_str = "store i32 0, i32* " + reg2;
+                    code_buffer.emit(f_str);
+                    int to_patch2 = code_buffer.emit("br label @");
+                    string next = code_buffer.genLabel();
+                    vector<pair<int,BranchLabelIndex>> list1 = CodeBuffer::makelist(pair<int,BranchLabelIndex>(to_patch1, FIRST));
+                    vector<pair<int,BranchLabelIndex>> list2 = CodeBuffer::makelist(pair<int,BranchLabelIndex>(to_patch2, FIRST));
+				    code_buffer.bpatch($4.get_true_list(), t_label);
+				    code_buffer.bpatch($4.get_false_list(), f_label);
+				    code_buffer.bpatch(list1, next);
+				    code_buffer.bpatch(list2, next);
+				}
 			}
-			|BOOL ID ASSIGN BoolExp SC{
-            				try{
-            					symbol_table.insert($2.get_id(), "BOOL");
-            				}catch(Symbol_Table::ST_def& e){ // the id is used already
-            					output::errorDef(yylineno, e.get_raised_id());
-            					exit(0);
-            				}
-            				$$.set_type("VOID");
-            			}
 			|EnumType ID ASSIGN Exp SC{
 				try{
 					symbol_table.insertEnumVar($2.get_id(), $1.get_type(), $4.get_Val());
@@ -278,12 +333,22 @@ Statement:	LBRACE OpenScope Statements CloseScope RBRACE{
 					output::errorUndefEnumValue(yylineno, $2.get_id());
 					exit(0);
 				}
+
+                //LLVM:
+                $$.reset();
 				$$.set_type("VOID");
-				
+				int offset = symbol_table.get_offset($2.get_id());
+				string reg1 = freshVar();
+				string str1 = reg1 + " = getelementptr i32, i32* %stack, i32 " + to_string(offset);
+				code_buffer.emit(str1);
+				//int enum_value = symbol_table.get_order_of_enum($4.get_Val());
+				int enum_value = 0;
+				string str2 = "store i32 " + to_string(enum_value) + ", i32* " + reg1;
+				code_buffer.emit(str2);
 			}
 			|ID ASSIGN Exp SC{
 				try{
-					if ( symbol_table.get_datatype($1.get_id())!= ENUM_VAR && symbol_table.get_datatype($1.get_id()) != VAR){
+					if (symbol_table.get_datatype($1.get_id())!= ENUM_VAR && symbol_table.get_datatype($1.get_id()) != VAR){
 						// if the id doesnt exist
 						output::errorUndef(yylineno,$1.get_id());
 						exit(0);
@@ -302,24 +367,57 @@ Statement:	LBRACE OpenScope Statements CloseScope RBRACE{
 					output::errorUndef(yylineno,e.get_raised_id());
 					exit(0);
 				}
+
+				//LLVM:
+				$$.reset();
 				$$.set_type("VOID");
 				int offset = symbol_table.get_offset($1.get_id());
 				string reg1 = freshVar();
-				const string my_string1 = reg1 + " = getelementptr i32, i32* %stack, i32 " + to_string(offset);
-				code_buffer.emit(my_string1);
-				const string my_string2 = "store i32 " + $3.get_place() + ", i32* " + reg1;
-				code_buffer.emit(my_string2);
+				string str1 = reg1 + " = getelementptr i32, i32* %stack, i32 " + to_string(offset);
+				if (symbol_table.get_var_type($1.get_id()) != "BOOL") {
+                    code_buffer.emit(str1);
+                    string str2 = "store i32 " + $3.get_place() + ", i32* " + reg1;
+                    code_buffer.emit(str2);
+				}
+				else {
+				    string t_label = code_buffer.genLabel();
+				    code_buffer.emit(str1);
+                    string t_str = "store i32 1, i32* " + reg1;
+                    code_buffer.emit(t_str);
+                    int to_patch1 = code_buffer.emit("br label @");
+				    string f_label = code_buffer.genLabel();
+				    string reg2 = freshVar();
+				    string str2 = reg2 + " = getelementptr i32, i32* %stack, i32 " + to_string(offset);
+				    code_buffer.emit(str2);
+                    string f_str = "store i32 0, i32* " + reg2;
+                    code_buffer.emit(f_str);
+                    int to_patch2 = code_buffer.emit("br label @");
+                    string next = code_buffer.genLabel();
+                    vector<pair<int,BranchLabelIndex>> list1 = CodeBuffer::makelist(pair<int,BranchLabelIndex>(to_patch1, FIRST));
+                    vector<pair<int,BranchLabelIndex>> list2 = CodeBuffer::makelist(pair<int,BranchLabelIndex>(to_patch2, FIRST));
+				    code_buffer.bpatch($3.get_true_list(), t_label);
+				    code_buffer.bpatch($3.get_false_list(), f_label);
+				    code_buffer.bpatch(list1, next);
+				    code_buffer.bpatch(list2, next);
+				}
 			}
 			|Call SC{
+
+				//LLVM:
+				$$.reset();
 				$$.set_type("VOID");
-				code_buffer.emit($1.get_place());
+
 			}
 			|RETURN SC{
 				if (RetType_flag != "VOID"){
 					output::errorMismatch(yylineno);
 					exit(0);
 				}
+
+				//LLVM:
+				$$.reset();
 				$$.set_type("VOID");
+
 			}
 			|RETURN Exp SC{
 				if ((RetType_flag != $2.get_type() && !( RetType_flag == "INT" && $2.get_type() == "BYTE")) || $2.get_type() == "VOID"){
@@ -327,51 +425,94 @@ Statement:	LBRACE OpenScope Statements CloseScope RBRACE{
 					exit(0);
 				}
 				$$.set_type($2.get_type());
-				code_buffer.emit("ret i32 " + $2.get_place());
-				code_buffer.emit("}");
 
+				//LLVM:
+				$$.reset();
+				if($2.get_type() != "BOOL")
+				    code_buffer.emit("ret i32 " + $2.get_place());
+				else {
+                    string label1 = code_buffer.genLabel();
+                    code_buffer.emit("ret i32 1");
+                    string label2 = code_buffer.genLabel();
+                    code_buffer.emit("ret i32 0");
+                    code_buffer.bpatch($2.get_true_list(), label1);
+                    code_buffer.bpatch($2.get_false_list(), label2);
+				}
 			}
 			|IF LPAREN BoolExp RPAREN OpenScope M Statement CloseScope {
 				$$.set_type($7.get_type());
 
 				//LLVM:
-/*
-                int next = code_buffer.emit("br label @");
+				$$.set_break_list($7.get_break_list());
+				$$.set_continue_list($7.get_continue_list());
+
+				int to_patch = code_buffer.emit("br label @");
+				vector<pair<int,BranchLabelIndex>> list = CodeBuffer::makelist(pair<int,BranchLabelIndex>(to_patch, FIRST));
+                string my_label = code_buffer.genLabel();
                 code_buffer.bpatch($3.get_true_list(), $6.get_quad());
-                vector<pair<int,BranchLabelIndex>> new_list = CodeBuffer::makelist(pair<int,BranchLabelIndex>(next, FIRST));
-                vector<pair<int,BranchLabelIndex>> merged_list = CodeBuffer::merge($3.get_false_list(), new_list);
-                $$.set_next_list(merged_list);
-*/
-			}
+                code_buffer.bpatch($3.get_false_list(), my_label);
+                code_buffer.bpatch(list, my_label);
+
+            	}
 			|IF LPAREN BoolExp RPAREN OpenScope M Statement CloseScope ELSE N M OpenScope Statement CloseScope {
 				$$.set_type2($7.get_type(), $13.get_type());
 
 				//LLVM:
-/*
-				int next = code_buffer.emit("br label @");
+				vector<pair<int,BranchLabelIndex>> b_list = CodeBuffer::merge($7.get_break_list(), $13.get_break_list());
+				vector<pair<int,BranchLabelIndex>> c_list = CodeBuffer::merge($7.get_continue_list(), $13.get_continue_list());
+				$$.set_break_list(b_list);
+				$$.set_continue_list(c_list);
+
+				int to_patch = code_buffer.emit("br label @");
+				vector<pair<int,BranchLabelIndex>> list = CodeBuffer::makelist(pair<int,BranchLabelIndex>(to_patch, FIRST));
+				string my_label = code_buffer.genLabel();
                 code_buffer.bpatch($3.get_true_list(), $6.get_quad());
                 code_buffer.bpatch($3.get_false_list(), $11.get_quad());
-                vector<pair<int,BranchLabelIndex>> new_list = CodeBuffer::makelist(pair<int,BranchLabelIndex>(next, FIRST));
-                vector<pair<int,BranchLabelIndex>> merged_list = CodeBuffer::merge($10.get_next_list(), new_list);
-                $$.set_next_list(merged_list);
-*/
+                code_buffer.bpatch($10.get_next_list(), my_label);
+                code_buffer.bpatch(list, my_label);
 			}
-			|WHILE LPAREN BoolExp RPAREN TurnOnWhile OpenScope Statement TurnOffWhile CloseScope{
-				$$.set_type($7.get_type());
+			|WHILE N M LPAREN BoolExp RPAREN TurnOnWhile OpenScope M Statement N TurnOffWhile CloseScope{
+				$$.set_type($10.get_type());
+
+				//LLVM:
+				$$.reset();
+                string my_label = code_buffer.genLabel();
+                code_buffer.bpatch($2.get_next_list(), $3.get_quad());
+                code_buffer.bpatch($5.get_true_list(), $9.get_quad());
+                code_buffer.bpatch($5.get_false_list(), my_label);
+                code_buffer.bpatch($11.get_next_list(), $3.get_quad());
+
+                code_buffer.bpatch($10.get_break_list(), my_label);
+                code_buffer.bpatch($10.get_continue_list(), $3.get_quad());
 			}
-			|BREAK SC{
-				if (!while_flag){
+			|BREAK SC {
+				if (while_flag == 0){
 					output::errorUnexpectedBreak(yylineno);
 					exit(0);
 				}
 				$$.set_type("VOID");
+
+				//LLVM:
+				$$.reset();
+				int to_patch = code_buffer.emit("br label @");
+				vector<pair<int,BranchLabelIndex>> list = CodeBuffer::makelist(pair<int,BranchLabelIndex>(to_patch, FIRST));
+				$$.set_break_list(list);
+				code_buffer.genLabel(); //necessary dummy
 			}
-			|CONTINUE SC{
-				if (!while_flag){
+			|CONTINUE SC {
+				if (while_flag == 0){
 					output::errorUnexpectedContinue(yylineno);
 					exit(0);
 				}
 				$$.set_type("VOID");
+
+				//LLVM:
+				$$.reset();
+				int to_patch = code_buffer.emit("br label @");
+				vector<pair<int,BranchLabelIndex>> list = CodeBuffer::makelist(pair<int,BranchLabelIndex>(to_patch, FIRST));
+				$$.set_continue_list(list);
+				code_buffer.genLabel(); //necessary dummy
+
 			}
 ;
 Call:	ID LPAREN ExpList RPAREN{
@@ -399,14 +540,32 @@ Call:	ID LPAREN ExpList RPAREN{
 				return_type = "i32";
 			}
 			string places_list = "";
-			for (int i = 0; i < exp_list.size(); i++ ){
+			for (int i = 0; i < exp_list.size(); i++ ) {
 				places_list += "i32 " + exp_list[i].get_place();
 				if (i < exp_list.size() - 1){
 					places_list += ", ";
 				}
 			}
-			string my_call_string = "call " + return_type + " @" + $1.get_id() + "(" + places_list + ")";
-			$$.set_place(my_call_string);
+			string str;
+			if (return_type == "void") {
+			    str = "call " + return_type + " @" + $1.get_id() + "(" + places_list + ")";
+			    code_buffer.emit(str);
+			    $$.set_place("NOT SUPPOSED TO BE HERE");
+			}
+			 else {
+			    string reg = freshVar();
+			    str = reg + " = " + "call " + return_type + " @" + $1.get_id() + "(" + places_list + ")";
+			    code_buffer.emit(str);
+			    $$.set_place(reg);
+			    if (symbol_table.get_func_retType($1.get_id()) == "BOOL") {
+                    string str2 = "br i1 " + reg + ", label @, label @";
+                    int to_patch = code_buffer.emit(str2);
+                    vector<pair<int,BranchLabelIndex>> t_list = CodeBuffer::makelist(pair<int,BranchLabelIndex>(to_patch, FIRST));
+                    vector<pair<int,BranchLabelIndex>> f_list = CodeBuffer::makelist(pair<int,BranchLabelIndex>(to_patch, SECOND));
+                    $$.set_true_list(t_list);
+                    $$.set_false_list(f_list);
+                }
+			}
 		}
 		|ID LPAREN RPAREN{
 			$$.reset();
@@ -432,17 +591,73 @@ Call:	ID LPAREN ExpList RPAREN{
 			else{
 				return_type = "i32";
 			}
-			string my_call_string = "call " + return_type + " @" + $1.get_id() + "()";
-			$$.set_place(my_call_string);
+            string str;
+			if (return_type == "void") {
+			    str = "call " + return_type + " @" + $1.get_id() + "()";
+			    code_buffer.emit(str);
+			    $$.set_place("NOT SUPPOSED TO BE HERE");
+			}
+			 else {
+			    string reg = freshVar();
+			    str = reg + " = " + "call " + return_type + " @" + $1.get_id() + "()";
+			    code_buffer.emit(str);
+			    $$.set_place(reg);
+			    if (symbol_table.get_func_retType($1.get_id()) == "BOOL") {
+                    string reg2 = freshVar();
+                    string str2 = reg2 + " = trunc i32 " + reg + " to i1";
+                    code_buffer.emit(str2);
+                    string str3 = "br i1 " + reg2 + ", label @, label @";
+                    int to_patch = code_buffer.emit(str3);
+                    vector<pair<int,BranchLabelIndex>> t_list = CodeBuffer::makelist(pair<int,BranchLabelIndex>(to_patch, FIRST));
+                    vector<pair<int,BranchLabelIndex>> f_list = CodeBuffer::makelist(pair<int,BranchLabelIndex>(to_patch, SECOND));
+                    $$.set_true_list(t_list);
+                    $$.set_false_list(f_list);
+                }
+			}
 		}
 ;
 ExpList:	Exp{
 				$$.reset();
+				if ($1.get_type() == "BOOL") {
+                    string label1 = code_buffer.genLabel();
+                    int br1 = code_buffer.emit("br label @");
+                    string label2 = code_buffer.genLabel();
+                    int br2 = code_buffer.emit("br label @");
+                    string label3 = code_buffer.genLabel();
+                    string reg = freshVar();
+                    string phi_str = reg + " = phi i32 [ 1, %" + label1 + " ], [ 0, %" + label2 + " ]";
+                    code_buffer.emit(phi_str);
+                    vector<pair<int,BranchLabelIndex>> list1 = CodeBuffer::makelist(pair<int,BranchLabelIndex>(br1, FIRST));
+                    vector<pair<int,BranchLabelIndex>> list2 = CodeBuffer::makelist(pair<int,BranchLabelIndex>(br2, FIRST));
+                    code_buffer.bpatch($1.get_true_list(), label1);
+                    code_buffer.bpatch($1.get_false_list(), label2);
+                    code_buffer.bpatch(list1, label3);
+                    code_buffer.bpatch(list2, label3);
+                    $1.set_place(reg);  //Hope it is not a problem
+				}
 				$$.insert($1);
 			}
-			|Exp COMMA ExpList{
+			|Exp COMMA {
+				if ($1.get_type() == "BOOL") {
+                    string label1 = code_buffer.genLabel();
+                    int br1 = code_buffer.emit("br label @");
+                    string label2 = code_buffer.genLabel();
+                    int br2 = code_buffer.emit("br label @");
+                    string label3 = code_buffer.genLabel();
+                    string reg = freshVar();
+                    string phi_str = reg + " = phi i32 [ 1, %" + label1 + " ], [ 0, %" + label2 + " ]";
+                    code_buffer.emit(phi_str);
+                    vector<pair<int,BranchLabelIndex>> list1 = CodeBuffer::makelist(pair<int,BranchLabelIndex>(br1, FIRST));
+                    vector<pair<int,BranchLabelIndex>> list2 = CodeBuffer::makelist(pair<int,BranchLabelIndex>(br2, FIRST));
+                    code_buffer.bpatch($1.get_true_list(), label1);
+                    code_buffer.bpatch($1.get_false_list(), label2);
+                    code_buffer.bpatch(list1, label3);
+                    code_buffer.bpatch(list2, label3);
+                    $1.set_place(reg);  //Hope it is not a problem
+				}
+			} ExpList{
 				$$.reset();
-				$$.join_lists($3);
+				$$.join_lists($4);
 				$$.insert($1);
 			}
 ;
@@ -463,6 +678,13 @@ EnumType:	ENUM ID{
 Exp:	LPAREN Exp RPAREN{
 			$$.reset();
 			$$.set_type($2.get_type());
+
+			//LLVM:
+			if($2.get_type() != "BOOL")
+			    $$.set_place($2.get_place());
+			$$.set_true_list($2.get_true_list());
+			$$.set_false_list($2.get_false_list());
+			//TODO : why we do set place just for not booleans ?
 		}
 		|Exp BINOP_MUL Exp{
 			$$.reset();
@@ -476,9 +698,9 @@ Exp:	LPAREN Exp RPAREN{
 			else{
 				$$.set_type("BYTE");
 			}
-			string* new_place = new string(freshVar());
-			$$.set_place(*new_place);
-			const string my_string3 =  *new_place + " = mul i32 " + $1.get_place() + ", " + $3.get_place();
+			string new_place = freshVar();
+			$$.set_place(new_place);
+			const string my_string3 =  new_place + " = mul i32 " + $1.get_place() + ", " + $3.get_place();
 			code_buffer.emit(my_string3);
 		}
 		|Exp BINOP_DIV Exp{
@@ -494,15 +716,22 @@ Exp:	LPAREN Exp RPAREN{
 				$$.set_type("BYTE");
 			}
 			string div_0_reg = freshVar();
-			code_buffer.emit(div_0_reg + "= icmp eq i32 0, " + $3.get_place());
-			int bp_address = code_buffer.emit("br " + div_0_reg + ", label %Division_by_0, label @" );
+			code_buffer.emit(div_0_reg + " = icmp eq i32 0, " + $3.get_place());
+			int bp_address = code_buffer.emit("br i1 " + div_0_reg + ", label @, label @");
+			vector<pair<int,BranchLabelIndex>> list_exit = CodeBuffer::makelist(pair<int,BranchLabelIndex>(bp_address, FIRST));
+			vector<pair<int,BranchLabelIndex>> list_next = CodeBuffer::makelist(pair<int,BranchLabelIndex>(bp_address, SECOND));
+			string label_exit = code_buffer.genLabel();
+			code_buffer.emit("call void @exit(i32 1)");
+			int to_patch = code_buffer.emit("br label @");
+			vector<pair<int,BranchLabelIndex>> list_redundant = CodeBuffer::makelist(pair<int,BranchLabelIndex>(to_patch, FIRST));
+			string my_label = code_buffer.genLabel();
+			code_buffer.bpatch(list_exit, label_exit);
+			code_buffer.bpatch(list_next, my_label);
+			code_buffer.bpatch(list_redundant, my_label);
 			string new_place = freshVar();
 			$$.set_place(new_place);
-			const string my_label = code_buffer.genLabel();
-			const string my_string3 =  new_place + " = div i32 " + $1.get_place() + ", " + $3.get_place();
+			string my_string3 =  new_place + " = sdiv i32 " + $1.get_place() + ", " + $3.get_place();
 			code_buffer.emit(my_string3);
-			vector<pair<int,BranchLabelIndex>> list = CodeBuffer::makelist(pair<int,BranchLabelIndex>(bp_address, FIRST));
-			code_buffer.bpatch(list, my_label);
 		}
 		|Exp BINOP_ADD Exp{
 			$$.reset();
@@ -516,9 +745,9 @@ Exp:	LPAREN Exp RPAREN{
 			else{
 				$$.set_type("BYTE");
 			}
-			string* new_place = new string(freshVar());
-			$$.set_place(*new_place);
-			const string my_string3 =  *new_place + " = add i32 " + $1.get_place() + ", " + $3.get_place();
+			string new_place = freshVar();
+			$$.set_place(new_place);
+			const string my_string3 =  new_place + " = add i32 " + $1.get_place() + ", " + $3.get_place();
 			code_buffer.emit(my_string3);
 		}
 		|Exp BINOP_SUB Exp{
@@ -533,9 +762,9 @@ Exp:	LPAREN Exp RPAREN{
 			else{
 				$$.set_type("BYTE");
 			}
-			string* new_place = new string(freshVar());
-			$$.set_place(*new_place);
-			const string my_string3 =  *new_place + " = sub i32 " + $1.get_place() + ", " + $3.get_place();
+			string new_place = freshVar();
+			$$.set_place(new_place);
+			const string my_string3 =  new_place + " = sub i32 " + $1.get_place() + ", " + $3.get_place();
 			code_buffer.emit(my_string3);
 		}
 		|ID{
@@ -563,19 +792,31 @@ Exp:	LPAREN Exp RPAREN{
 			}
 			int offset = symbol_table.get_offset($1.get_id());
 			string reg1 = freshVar();
-			const string my_string1 = reg1 + " = getelementptr i32, i32* %stack, i32 " + to_string(offset);
-			code_buffer.emit(my_string1);
+			const string str1 = reg1 + " = getelementptr i32, i32* %stack, i32 " + to_string(offset);
+			code_buffer.emit(str1);
 			string reg2 = freshVar();
-			const string my_string = reg2 + " = load i32, i32* " + reg1;
-			code_buffer.emit( my_string);
+			string str2 = reg2 + " = load i32, i32* " + reg1;
+			code_buffer.emit(str2);
+			if (type == "BOOL") {
+                string reg3 = freshVar();
+                string str3 = reg3 + " = trunc i32 " + reg2 + " to i1";
+                code_buffer.emit(str3);
+                string str4 = "br i1 " + reg3 + ", label @, label @";
+                int to_patch = code_buffer.emit(str4);
+                vector<pair<int,BranchLabelIndex>> t_list = CodeBuffer::makelist(pair<int,BranchLabelIndex>(to_patch, FIRST));
+                vector<pair<int,BranchLabelIndex>> f_list = CodeBuffer::makelist(pair<int,BranchLabelIndex>(to_patch, SECOND));
+                $$.set_true_list(t_list);
+                $$.set_false_list(f_list);
+            }
 			$$.set_place(reg2);
 		}
 		|Call{
 			$$.reset();
 			$$.set_type($1.get_type());
-			string regtemp = freshVar();
-			code_buffer.emit(regtemp + " = " + $1.get_place() );
-			$$.set_place(regtemp);
+            $$.set_place($1.get_place());
+            $$.set_true_list($1.get_true_list());
+            $$.set_false_list($1.get_false_list());
+
 		}
 		|NUM{
 			$$.reset();
@@ -613,61 +854,71 @@ Exp:	LPAREN Exp RPAREN{
          		exit(0);
 			}
 			$$.set_type("INT");
-		}
-;
-BoolExp: Exp {
-            //$$.BoolExp_reset();
-			if ($1.get_type() != "BOOL") {
-				output::errorMismatch(yylineno);
-				exit(0);
-				}
+			$$.set_place($4.get_place());
 		}
 		|TRUE {
 			$$.reset();
 			$$.set_type("BOOL");
 
+			//LLVM:
+            int to_patch = code_buffer.emit("br label @");
+            vector<pair<int,BranchLabelIndex>> list = CodeBuffer::makelist(pair<int,BranchLabelIndex>(to_patch, FIRST));
+            $$.set_true_list(list);
+
 		}
 		|FALSE {
 			$$.reset();
 			$$.set_type("BOOL");
+
+			//LLVM:
+            int to_patch = code_buffer.emit("br label @");
+            vector<pair<int,BranchLabelIndex>> list = CodeBuffer::makelist(pair<int,BranchLabelIndex>(to_patch, FIRST));
+            $$.set_false_list(list);
+
 		}
 		|NOT Exp {
 			$$.reset();
-			if ($2.get_type() != "BOOL" ) {
+			if ($2.get_type() != "BOOL") {
 				output::errorMismatch(yylineno);
          		exit(0);
 			}
 			$$.set_type("BOOL");
+
+			//LLVM:
+			    $$.set_true_list($2.get_false_list());
+			    $$.set_false_list($2.get_true_list());
 		}
 		|Exp AND M Exp {
 			$$.reset();
-			if ($1.get_type() != "BOOL" || $4.get_type() != "BOOL" ){
+			if ($1.get_type() != "BOOL" || $4.get_type() != "BOOL") {
 				output::errorMismatch(yylineno);
          		exit(0);
 			}
 			$$.set_type("BOOL");
-/*
+
             //LLVM:
             code_buffer.bpatch($1.get_true_list(), $3.get_quad());
-            vector<pair<int,BranchLabelIndex>> merged_list = CodeBuffer::merge($1.get_false_list(), $4.get_false_list());
-            $$.set_false_list(merged_list);
+            vector<pair<int,BranchLabelIndex>> e1_f = $1.get_false_list();
+            vector<pair<int,BranchLabelIndex>> e2_f = $4.get_false_list();
+            vector<pair<int,BranchLabelIndex>> f_list = CodeBuffer::merge(e1_f, e2_f);
             $$.set_true_list($4.get_true_list());
-*/
+            $$.set_false_list(f_list);
 		}
 		|Exp OR M Exp {
 			$$.reset();
-			if ($1.get_type() != "BOOL" || $4.get_type() != "BOOL" ) {
+			if ($1.get_type() != "BOOL" || $4.get_type() != "BOOL") {
 				output::errorMismatch(yylineno);
          		exit(0);
 			}
 			$$.set_type("BOOL");
-/*
+
             //LLVM:
             code_buffer.bpatch($1.get_false_list(), $3.get_quad());
-            vector<pair<int,BranchLabelIndex>> merged_list = CodeBuffer::merge($1.get_true_list(), $4.get_true_list());
-            $$.set_true_list(merged_list);
+            vector<pair<int,BranchLabelIndex>> e1_t = $1.get_true_list();
+            vector<pair<int,BranchLabelIndex>> e2_t = $4.get_true_list();
+            vector<pair<int,BranchLabelIndex>> t_list = CodeBuffer::merge(e1_t, e2_t);
+            $$.set_true_list(t_list);
             $$.set_false_list($4.get_false_list());
-*/
 		}
 		|Exp RELOP_EQ Exp {
 			$$.reset();
@@ -679,11 +930,17 @@ BoolExp: Exp {
 
 			//LLVM:
 			string reg = freshVar();
-			string str = reg + " = icmp eq i32 " + ($1.get_place()) + ", " + ($3.get_place());
-			int line = code_buffer.emit(str);
+			string str1 = reg + " = icmp eq i32 " + ($1.get_place()) + ", " + ($3.get_place());
+			int line = code_buffer.emit(str1);
+            $$.set_place(reg);
+
 			string str2 = "br i1 " + reg + ", label @, label @";
-			int next = code_buffer.emit(str2);
-			//add true_list and false_list, maybe also add place
+            int to_patch = code_buffer.emit(str2);
+            vector<pair<int,BranchLabelIndex>> t_list = CodeBuffer::makelist(pair<int,BranchLabelIndex>(to_patch, FIRST));
+			vector<pair<int,BranchLabelIndex>> f_list = CodeBuffer::makelist(pair<int,BranchLabelIndex>(to_patch, SECOND));
+			$$.set_true_list(t_list);
+            $$.set_false_list(f_list);
+
 		}
 		|Exp RELOP_NE Exp {
         	$$.reset();
@@ -695,11 +952,16 @@ BoolExp: Exp {
 
 			//LLVM:
 			string reg = freshVar();
-			string str = reg + " = icmp ne i32 " + ($1.get_place()) + ", " + ($3.get_place());
-			int line = code_buffer.emit(str);
+			string str1 = reg + " = icmp ne i32 " + ($1.get_place()) + ", " + ($3.get_place());
+			int line = code_buffer.emit(str1);
+            $$.set_place(reg);
+
 			string str2 = "br i1 " + reg + ", label @, label @";
-			int next = code_buffer.emit(str2);
-			//add true_list and false_list, maybe also add place
+            int to_patch = code_buffer.emit(str2);
+            vector<pair<int,BranchLabelIndex>> t_list = CodeBuffer::makelist(pair<int,BranchLabelIndex>(to_patch, FIRST));
+			vector<pair<int,BranchLabelIndex>> f_list = CodeBuffer::makelist(pair<int,BranchLabelIndex>(to_patch, SECOND));
+			$$.set_true_list(t_list);
+            $$.set_false_list(f_list);
         }
 		|Exp RELOP_LT Exp {
 			$$.reset();
@@ -711,15 +973,20 @@ BoolExp: Exp {
 
 			//LLVM:
 			string reg = freshVar();
-			string str;
+			string str1, str2;
 			if ($1.get_type() == "BYTE" && $3.get_type() == "BYTE")
-			    str = reg + " = icmp ult i32 " + ($1.get_place()) + ", " + ($3.get_place());
+			    str1 = reg + " = icmp ult i32 " + ($1.get_place()) + ", " + ($3.get_place());
 			else
-			    str = reg + " = icmp slt i32 " + ($1.get_place()) + ", " + ($3.get_place());
-			int line = code_buffer.emit(str);
-			string str2 = "br i1 " + reg + ", label @, label @";
-			int next = code_buffer.emit(str2);
-			//add true_list and false_list, maybe also add place
+			    str1 = reg + " = icmp slt i32 " + ($1.get_place()) + ", " + ($3.get_place());
+			int line = code_buffer.emit(str1);
+            $$.set_place(reg);
+
+			str2 = "br i1 " + reg + ", label @, label @";
+            int to_patch = code_buffer.emit(str2);
+            vector<pair<int,BranchLabelIndex>> t_list = CodeBuffer::makelist(pair<int,BranchLabelIndex>(to_patch, FIRST));
+			vector<pair<int,BranchLabelIndex>> f_list = CodeBuffer::makelist(pair<int,BranchLabelIndex>(to_patch, SECOND));
+			$$.set_true_list(t_list);
+            $$.set_false_list(f_list);
 		}
 		|Exp RELOP_GT Exp {
 			$$.reset();
@@ -731,15 +998,20 @@ BoolExp: Exp {
 
 			//LLVM:
 			string reg = freshVar();
-			string str;
+			string str1, str2;
 			if ($1.get_type() == "BYTE" && $3.get_type() == "BYTE")
-			    str = reg + " = icmp ugt i32 " + ($1.get_place()) + ", " + ($3.get_place());
+			    str1 = reg + " = icmp ugt i32 " + ($1.get_place()) + ", " + ($3.get_place());
 			else
-			    str = reg + " = icmp sgt i32 " + ($1.get_place()) + ", " + ($3.get_place());
-			int line = code_buffer.emit(str);
-			string str2 = "br i1 " + reg + ", label @, label @";
-			int next = code_buffer.emit(str2);
-			//add true_list and false_list, maybe also add place
+			    str1 = reg + " = icmp sgt i32 " + ($1.get_place()) + ", " + ($3.get_place());
+			int line = code_buffer.emit(str1);
+            $$.set_place(reg);
+
+			str2 = "br i1 " + reg + ", label @, label @";
+            int to_patch = code_buffer.emit(str2);
+            vector<pair<int,BranchLabelIndex>> t_list = CodeBuffer::makelist(pair<int,BranchLabelIndex>(to_patch, FIRST));
+			vector<pair<int,BranchLabelIndex>> f_list = CodeBuffer::makelist(pair<int,BranchLabelIndex>(to_patch, SECOND));
+			$$.set_true_list(t_list);
+            $$.set_false_list(f_list);
 		}
 		|Exp RELOP_LE Exp {
 			$$.reset();
@@ -751,15 +1023,20 @@ BoolExp: Exp {
 
 			//LLVM:
 			string reg = freshVar();
-			string str;
+			string str1, str2;
 			if ($1.get_type() == "BYTE" && $3.get_type() == "BYTE")
-			    str = reg + " = icmp ule i32 " + ($1.get_place()) + ", " + ($3.get_place());
+			    str1 = reg + " = icmp ule i32 " + ($1.get_place()) + ", " + ($3.get_place());
 			else
-			    str = reg + " = icmp sle i32 " + ($1.get_place()) + ", " + ($3.get_place());
-			int line = code_buffer.emit(str);
-			string str2 = "br i1 " + reg + ", label @, label @";
-			int next = code_buffer.emit(str2);
-			//add true_list and false_list, maybe also add place
+			    str1 = reg + " = icmp sle i32 " + ($1.get_place()) + ", " + ($3.get_place());
+			int line = code_buffer.emit(str1);
+            $$.set_place(reg);
+
+			str2 = "br i1 " + reg + ", label @, label @";
+            int to_patch = code_buffer.emit(str2);
+            vector<pair<int,BranchLabelIndex>> t_list = CodeBuffer::makelist(pair<int,BranchLabelIndex>(to_patch, FIRST));
+			vector<pair<int,BranchLabelIndex>> f_list = CodeBuffer::makelist(pair<int,BranchLabelIndex>(to_patch, SECOND));
+			$$.set_true_list(t_list);
+            $$.set_false_list(f_list);
 		}
 		|Exp RELOP_GE Exp {
 			$$.reset();
@@ -771,23 +1048,52 @@ BoolExp: Exp {
 
 			//LLVM:
 			string reg = freshVar();
-			string str;
+			string str1 ,str2;
 			if ($1.get_type() == "BYTE" && $3.get_type() == "BYTE")
-			    str = reg + " = icmp uge i32 " + ($1.get_place()) + ", " + ($3.get_place());
+			    str1 = reg + " = icmp uge i32 " + ($1.get_place()) + ", " + ($3.get_place());
 			else
-			    str = reg + " = icmp sge i32 " + ($1.get_place()) + ", " + ($3.get_place());
-			int line = code_buffer.emit(str);
-			string str2 = "br i1 " + reg + ", label @, label @";
-			int next = code_buffer.emit(str2);
-			//add true_list and false_list, maybe also add place
+			    str1 = reg + " = icmp sge i32 " + ($1.get_place()) + ", " + ($3.get_place());
+			int line = code_buffer.emit(str1);
+            $$.set_place(reg);
+
+			str2 = "br i1 " + reg + ", label @, label @";
+            int to_patch = code_buffer.emit(str2);
+            vector<pair<int,BranchLabelIndex>> t_list = CodeBuffer::makelist(pair<int,BranchLabelIndex>(to_patch, FIRST));
+			vector<pair<int,BranchLabelIndex>> f_list = CodeBuffer::makelist(pair<int,BranchLabelIndex>(to_patch, SECOND));
+			$$.set_true_list(t_list);
+            $$.set_false_list(f_list);
 		}
 ;
+BoolExp: Exp {
+            $$.reset();
+			if ($1.get_type() != "BOOL") {
+				output::errorMismatch(yylineno);
+				exit(0);
+				}
+
+			//LLVM:
+			    $$.set_true_list($1.get_true_list());
+			    $$.set_false_list($1.get_false_list());
+            }
+;
 InsertFunc:	/*epsilon*/ {
-				while_flag = false;
+				while_flag = 0;
 				vector<string> param1 = {"STRING"};
 				vector<string> param2 = {"INT"};
 				symbol_table.insertFunc("print", "VOID", param1);
 				symbol_table.insertFunc("printi", "VOID", param2);
+
+				//LLVM:
+				code_buffer.emitGlobal("declare i32 @printf(i8, ...)");
+				code_buffer.emitGlobal("declare void @exit(i32)");
+				code_buffer.emitGlobal("define void @printi(i32) {");
+				code_buffer.emitGlobal("call i32 (i8*, ...) @printf(i8* getelementptr ([4 x i8], [4 x i8]* @.int_specifier, i32 0, i32 0), i32 %0)");
+				code_buffer.emitGlobal("ret void");
+				code_buffer.emitGlobal("}");
+				code_buffer.emitGlobal("define void @print(i8*) {");
+				code_buffer.emitGlobal("call i32 (i8*, ...) @printf(i8* getelementptr ([4 x i8], [4 x i8]* @.str_specifier, i32 0, i32 0), i8* %0)");
+				code_buffer.emitGlobal("ret void");
+				code_buffer.emitGlobal("}");
 			}
 ;
 OpenScope: /*epsilon*/ {
@@ -804,11 +1110,11 @@ CloseScope: /*epsilon*/ {
 }
 ;
 TurnOnWhile: /*epsilon*/ {
-			while_flag = true;
+			while_flag++;
 		}
 ;
 TurnOffWhile: /*epsilon*/ {
-			while_flag = false;
+			while_flag--;
 		}
 ;
 
@@ -834,6 +1140,7 @@ int yyerror(const char * message) {
 
 int main() {
 	int y = yyparse();
-	//code_buffer.printCodeBuffer();
+	code_buffer.printGlobalBuffer();
+	code_buffer.printCodeBuffer();
 	return y;
 }

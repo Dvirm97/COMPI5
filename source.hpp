@@ -48,13 +48,15 @@ class Statement: public Type{
     vector<pair<int,BranchLabelIndex>>* true_list;
     vector<pair<int,BranchLabelIndex>>* false_list;
     vector<pair<int,BranchLabelIndex>>* next_list;
+    vector<pair<int,BranchLabelIndex>>* break_list;
+    vector<pair<int,BranchLabelIndex>>* continue_list;
 public:
 
     void set_type2(const string& type1, const string& type2){
-        if (type1!="VOID" ){
+        if (type1!="VOID"){
             set_type(type1);
         }
-        else if(type2!="VOID" ){
+        else if(type2!="VOID"){
             set_type(type2);
         }
         else{
@@ -67,10 +69,24 @@ public:
     vector<pair<int,BranchLabelIndex>>& get_false_list(){
         return *false_list;
     }
+    vector<pair<int,BranchLabelIndex>>& get_break_list(){
+        return *break_list;
+    }
+    vector<pair<int,BranchLabelIndex>>& get_continue_list(){
+        return *continue_list;
+    }
+    void set_break_list(vector<pair<int,BranchLabelIndex>>& list){
+        break_list = new vector<pair<int,BranchLabelIndex>>(list);
+    }
+    void set_continue_list(vector<pair<int,BranchLabelIndex>>& list){
+        continue_list = new vector<pair<int,BranchLabelIndex>>(list);
+    }
     void reset(){
-        true_list = new vector<pair<int,BranchLabelIndex>>();
-        false_list = new vector<pair<int,BranchLabelIndex>>();
-        next_list = new vector<pair<int,BranchLabelIndex>>();
+        true_list = new vector<pair<int,BranchLabelIndex>>(0);
+        false_list = new vector<pair<int,BranchLabelIndex>>(0);
+        next_list = new vector<pair<int,BranchLabelIndex>>(0);
+        break_list = new vector<pair<int,BranchLabelIndex>>(0);
+        continue_list = new vector<pair<int,BranchLabelIndex>>(0);
     }
     void set_next_list(vector<pair<int,BranchLabelIndex>>& list){
         next_list = new vector<pair<int,BranchLabelIndex>>(list);
@@ -100,6 +116,8 @@ public:
 class Exp: public Type{
 	string* value;
 	string* place;
+    vector<pair<int,BranchLabelIndex>>* true_list;
+    vector<pair<int,BranchLabelIndex>>* false_list;
 public:
 	void set_Val(const string& Val){
         value = new string(Val);
@@ -113,36 +131,34 @@ public:
 	string& get_place() const{
 		return *place;
 	}
-	void reset(){
+	void reset() {
 		value = new string();
 		place = new string();
+        true_list = new vector<pair<int,BranchLabelIndex>>(0);
+        false_list = new vector<pair<int,BranchLabelIndex>>(0);
 	}
+
+    void set_true_list(vector<pair<int,BranchLabelIndex>>& item) {
+	    delete true_list;
+        true_list = new vector<pair<int,BranchLabelIndex>>(item);
+
+    }
+    void set_false_list(vector<pair<int,BranchLabelIndex>>& item) {
+        delete false_list;
+        false_list = new vector<pair<int,BranchLabelIndex>>(item);
+    }
+    vector<pair<int,BranchLabelIndex>>& get_true_list() {
+        return *true_list;
+    }
+    vector<pair<int,BranchLabelIndex>>& get_false_list() {
+        return *false_list;
+    }
+	friend class BoolExp;
 };
 
 class Call: public Exp{};
 
-class BoolExp: public Exp{
-    vector<pair<int,BranchLabelIndex>>* true_list;
-    vector<pair<int,BranchLabelIndex>>* false_list;
-public:
-    void set_true_list(vector<pair<int,BranchLabelIndex>>& item){
-        true_list = new vector<pair<int,BranchLabelIndex>>(item);
-    }
-    void set_false_list(vector<pair<int,BranchLabelIndex>>& item){
-        false_list = new vector<pair<int,BranchLabelIndex>>(item);
-    }
-    vector<pair<int,BranchLabelIndex>>& get_true_list(){
-        return *true_list;
-    }
-    vector<pair<int,BranchLabelIndex>>& get_false_list(){
-        return *false_list;
-    }
-    void BoolExp_reset(){
-        reset();
-        true_list = new vector<pair<int,BranchLabelIndex>>();
-        false_list = new vector<pair<int,BranchLabelIndex>>();
-    }
-};
+class BoolExp: public Exp{};
 
 class Enumerator: public Id{};
 
