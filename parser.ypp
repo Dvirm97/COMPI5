@@ -116,6 +116,7 @@ FuncDecl:	RetType {
 					vector<string>& params_type_list = $5.get_params_type();
 					vector<string>& params_id_list = $5.get_params_ids();
 					string param_type = "";
+					vector<string> params_regs;
 					for(int i = 0; i < params_type_list.size(); i++){
 						if (params_type_list[i] == "VOID"){
 							param_type = "void";
@@ -123,13 +124,20 @@ FuncDecl:	RetType {
 						else {
 							param_type = "i32";
 						}
-						my_string_param += param_type + " %" + params_id_list[i];
+						string reg_par = freshVar();
+						my_string_param += param_type + " " + reg_par;
+						params_regs.push_back(reg_par);
 						if (i < params_type_list.size()-1){
 							my_string_param += ", ";
 						}
 					}
 					string my_string = "define " + return_type + " @" + $3.get_id()+ "(" + my_string_param + "){";
 					code_buffer.emit(my_string);
+					for (int i = 0; i < params_type_list.size(); i++){
+						string new_reg = freshVar();
+						code_buffer.emit( new_reg + " = alloca i32 ");
+						code_buffer.emit(" store i32 " + params_regs[i] + ", i32* " + new_reg);
+					}
 					code_buffer.emit("%stack = alloca i32, i32 50");
 			} LBRACE Statements RBRACE CloseScope {
 				if ($9.get_type()== "VOID" && $1.get_type() != "VOID"){
