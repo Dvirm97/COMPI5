@@ -1107,7 +1107,7 @@ InsertFunc:	/*epsilon*/ {
 				symbol_table.insertFunc("printi", "VOID", param2);
 
 				//LLVM:
-				code_buffer.emitGlobal("declare i32 @printf(i8, ...)");
+				code_buffer.emitGlobal("declare i32 @printf(i8*, ...)");
 				code_buffer.emitGlobal("declare void @exit(i32)");
 				code_buffer.emitGlobal("@.str_specifier = constant [4 x i8] c\"%s\\0A\\00\"");
 				code_buffer.emitGlobal("@.int_specifier = constant [4 x i8] c\"%d\\0A\\00\"");
