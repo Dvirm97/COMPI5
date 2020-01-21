@@ -723,6 +723,17 @@ Exp:	LPAREN Exp RPAREN{
 			$$.set_place(new_place);
 			const string my_string3 =  new_place + " = mul i32 " + $1.get_place() + ", " + $3.get_place();
 			code_buffer.emit(my_string3);
+			if ($1.get_type() == "BYTE" && $3.get_type() == "BYTE"){
+				string reg_trunc1 = freshVar();
+				code_buffer.emit(reg_trunc1 + " = trunc i32 " + $1.get_place() + " to i8");
+				string reg_trunc2 = freshVar();
+				code_buffer.emit(reg_trunc2 + " = trunc i32 " + $3.get_place() + " to i8");
+				string reg_mul_trunc = freshVar();
+				code_buffer.emit(reg_mul_trunc + " = mul i8 " + reg_trunc1 + ", " + reg_trunc2);
+				string reg_zest = freshVar();
+				code_buffer.emit(reg_zest + " = zext i8 " + reg_mul_trunc + " to i32");
+				$$.set_place(reg_zest);
+			}
 		}
 		|Exp BINOP_DIV Exp{
 			$$.reset();
@@ -770,6 +781,17 @@ Exp:	LPAREN Exp RPAREN{
 			$$.set_place(new_place);
 			const string my_string3 =  new_place + " = add i32 " + $1.get_place() + ", " + $3.get_place();
 			code_buffer.emit(my_string3);
+			if ($1.get_type() == "BYTE" && $3.get_type() == "BYTE"){
+				string reg_trunc1 = freshVar();
+				code_buffer.emit(reg_trunc1 + " = trunc i32 " + $1.get_place() + " to i8");
+				string reg_trunc2 = freshVar();
+				code_buffer.emit(reg_trunc2 + " = trunc i32 " + $3.get_place() + " to i8");
+				string reg_mul_trunc = freshVar();
+				code_buffer.emit(reg_mul_trunc + " = mul i8 " + reg_trunc1 + ", " + reg_trunc2);
+				string reg_zest = freshVar();
+				code_buffer.emit(reg_zest + " = zext i8 " + reg_mul_trunc + " to i32");
+				$$.set_place(reg_zest);
+			}
 		}
 		|Exp BINOP_SUB Exp{
 			$$.reset();
@@ -787,6 +809,17 @@ Exp:	LPAREN Exp RPAREN{
 			$$.set_place(new_place);
 			const string my_string3 =  new_place + " = sub i32 " + $1.get_place() + ", " + $3.get_place();
 			code_buffer.emit(my_string3);
+			if ($1.get_type() == "BYTE" && $3.get_type() == "BYTE"){
+				string reg_trunc1 = freshVar();
+				code_buffer.emit(reg_trunc1 + " = trunc i32 " + $1.get_place() + " to i8");
+				string reg_trunc2 = freshVar();
+				code_buffer.emit(reg_trunc2 + " = trunc i32 " + $3.get_place() + " to i8");
+				string reg_mul_trunc = freshVar();
+				code_buffer.emit(reg_mul_trunc + " = mul i8 " + reg_trunc1 + ", " + reg_trunc2);
+				string reg_zest = freshVar();
+				code_buffer.emit(reg_zest + " = zext i8 " + reg_mul_trunc + " to i32");
+				$$.set_place(reg_zest);
+			}
 		}
 		|ID{
 			$$.reset();
