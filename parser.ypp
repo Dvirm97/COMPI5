@@ -227,13 +227,12 @@ Statements:	Statement {
                 $$.set_continue_list(c_list);
 			}
 ;
-Statement:	LBRACE OpenScope {code_buffer.emit("{");} Statements CloseScope RBRACE{
-				$$.set_type($4.get_type());
+Statement:	LBRACE OpenScope Statements CloseScope RBRACE{
+				$$.set_type($3.get_type());
 
                 //LLVM:
-                $$.set_break_list($4.get_break_list());
-                $$.set_continue_list($4.get_continue_list());
-				code_buffer.emit("}");
+                $$.set_break_list($3.get_break_list());
+                $$.set_continue_list($3.get_continue_list());
 			}
 			|Type ID SC{
 				try{
@@ -858,9 +857,9 @@ Exp:	LPAREN Exp RPAREN{
 			$$.reset();
 			$$.set_type("STRING");
 			string new_num = freshNum();
-			code_buffer.emitGlobal("@.str" + new_num + " = constant [" + to_string($1.get_value().size() - 1) + " x i8] c" + $1.get_value().substr(0,$1.get_value().size() - 1) + "\\00\"");
+			code_buffer.emitGlobal("@.str" + new_num + " = constant [" + to_string($1.get_value().size()) + " x i8] c" + $1.get_value().substr(0,$1.get_value().size() -1) + "\\0A\\00\"");
 			string register_that_keep_the_value = freshVar();
-			code_buffer.emit(register_that_keep_the_value + " = getelementptr [" + to_string($1.get_value().size() - 1) + " x i8], [" + to_string($1.get_value().size() - 1) + " x i8]* @.str" + new_num + ", i32 0, i32 0");
+			code_buffer.emit(register_that_keep_the_value + " = getelementptr [" + to_string($1.get_value().size()) + " x i8], [" + to_string($1.get_value().size()) + " x i8]* @.str" + new_num + ", i32 0, i32 0");
 			$$.set_place(register_that_keep_the_value);
 		}
 		|LPAREN Type RPAREN Exp {
