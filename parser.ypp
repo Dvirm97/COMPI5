@@ -36,9 +36,8 @@
 %left RELOP_NE
 %nonassoc RELOP_LT RELOP_GT RELOP_LE RELOP_GE
 %left BINOP_ADD
-%left BINOP_MUL
-%left BINOP_DIV
 %left BINOP_SUB
+%left BINOP_DIV BINOP_MUL
 %right NOT
 %left LPAREN RPAREN LBRACE RBRACE
 %nonassoc IF WHILE RETURN BREAK CONTINUE INT BYTE BOOL B ENUM SC VOID TRUE FALSE COMMA
@@ -147,6 +146,7 @@ FuncDecl:	RetType {
 				if($1.get_type() == "VOID") {
 						code_buffer.emit("ret void");
 				}
+				else code_buffer.emit("ret i32 0");
 				code_buffer.emit("}");
 			}
 ;
@@ -857,9 +857,9 @@ Exp:	LPAREN Exp RPAREN{
 			$$.reset();
 			$$.set_type("STRING");
 			string new_num = freshNum();
-			code_buffer.emitGlobal("@.str" + new_num + " = constant [" + to_string($1.get_value().size() - 1) + " x i8] c" + $1.get_value().substr(0,$1.get_value().size() - 1) + "\\00\"");
+			code_buffer.emitGlobal("@.str" + new_num + " = constant [" + to_string($1.get_value().size()) + " x i8] c" + $1.get_value().substr(0,$1.get_value().size() -1) + "\\0A\\00\"");
 			string register_that_keep_the_value = freshVar();
-			code_buffer.emit(register_that_keep_the_value + " = getelementptr [" + to_string($1.get_value().size() - 1) + " x i8], [" + to_string($1.get_value().size() - 1) + " x i8]* @.str" + new_num + ", i32 0, i32 0");
+			code_buffer.emit(register_that_keep_the_value + " = getelementptr [" + to_string($1.get_value().size()) + " x i8], [" + to_string($1.get_value().size()) + " x i8]* @.str" + new_num + ", i32 0, i32 0");
 			$$.set_place(register_that_keep_the_value);
 		}
 		|LPAREN Type RPAREN Exp {
