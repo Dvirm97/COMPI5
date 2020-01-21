@@ -15,7 +15,7 @@
 	int while_flag;
 	string RetType_flag;
 	CodeBuffer& code_buffer = CodeBuffer::instance();
-
+	int num_of_params = 0;
 	string freshVar() {
 		var_num++;
 		return ("%r" + to_string(var_num));
@@ -131,13 +131,15 @@ FuncDecl:	RetType {
 						}
 					}
 					string my_string = "define " + return_type + " @" + $3.get_id()+ "(" + my_string_param + "){";
+					num_of_params = params_type_list.size();
 					code_buffer.emit(my_string);
+					int to_allocate = 50 + params_type_list.size();
+					code_buffer.emit("%stack = alloca i32, i32 " + to_string(to_allocate));
 					for (int i = 0; i < params_type_list.size(); i++){
-						string new_reg = freshVar();
-						code_buffer.emit( new_reg + " = alloca i32 ");
-						code_buffer.emit(" store i32 " + params_regs[i] + ", i32* " + new_reg);
+						string reg1 = freshVar();
+						code_buffer.emit(reg1 + " = getelementptr i32, i32* %stack, i32 " + to_string(i));
+						code_buffer.emit(" store i32 " + params_regs[params_type_list.size() - i - 1] + ", i32* " + reg1);
 					}
-					code_buffer.emit("%stack = alloca i32, i32 50");
 			} LBRACE Statements RBRACE CloseScope {
 				if ($9.get_type()== "VOID" && $1.get_type() != "VOID"){
 					output::errorMismatch(yylineno);
@@ -245,7 +247,7 @@ Statement:	LBRACE OpenScope Statements CloseScope RBRACE{
                 //LLVM:
 				$$.reset();
 				$$.set_type("VOID");
-				int offset = symbol_table.get_offset($2.get_id());
+				int offset = symbol_table.get_offset($2.get_id()) + num_of_params;
 				string reg1 = freshVar();
 				string str1 = reg1 + " = getelementptr i32, i32* %stack, i32 " + to_string(offset);
 				code_buffer.emit(str1);
@@ -269,7 +271,7 @@ Statement:	LBRACE OpenScope Statements CloseScope RBRACE{
                 //LLVM:
                 $$.reset();
 				$$.set_type("VOID");
-				int offset = symbol_table.get_offset($2.get_id());
+				int offset = symbol_table.get_offset($2.get_id()) + num_of_params;
 				string reg1 = freshVar();
 				string str1 = reg1 + " = getelementptr i32, i32* %stack, i32 " + to_string(offset);
 				code_buffer.emit(str1);
@@ -297,7 +299,7 @@ Statement:	LBRACE OpenScope Statements CloseScope RBRACE{
 				//LLVM:
 				$$.reset();
 				$$.set_type("VOID");
-				int offset = symbol_table.get_offset($2.get_id());
+				int offset = symbol_table.get_offset($2.get_id()) + num_of_params;
 				string reg1 = freshVar();
 				string str1 = reg1 + " = getelementptr i32, i32* %stack, i32 " + to_string(offset);
 				if ($1.get_type() != "BOOL") {
@@ -351,7 +353,7 @@ Statement:	LBRACE OpenScope Statements CloseScope RBRACE{
                 //LLVM:
                 $$.reset();
 				$$.set_type("VOID");
-				int offset = symbol_table.get_offset($2.get_id());
+				int offset = symbol_table.get_offset($2.get_id()) + num_of_params;
 				string reg1 = freshVar();
 				string str1 = reg1 + " = getelementptr i32, i32* %stack, i32 " + to_string(offset);
 				code_buffer.emit(str1);
@@ -384,7 +386,7 @@ Statement:	LBRACE OpenScope Statements CloseScope RBRACE{
 				//LLVM:
 				$$.reset();
 				$$.set_type("VOID");
-				int offset = symbol_table.get_offset($1.get_id());
+				int offset = symbol_table.get_offset($1.get_id()) + num_of_params;
 				string reg1 = freshVar();
 				string str1 = reg1 + " = getelementptr i32, i32* %stack, i32 " + to_string(offset);
 				if (symbol_table.get_var_type($1.get_id()) != "BOOL") {
