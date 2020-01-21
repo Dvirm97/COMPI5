@@ -754,6 +754,10 @@ Exp:	LPAREN Exp RPAREN{
 			vector<pair<int,BranchLabelIndex>> list_exit = CodeBuffer::makelist(pair<int,BranchLabelIndex>(bp_address, FIRST));
 			vector<pair<int,BranchLabelIndex>> list_next = CodeBuffer::makelist(pair<int,BranchLabelIndex>(bp_address, SECOND));
 			string label_exit = code_buffer.genLabel();
+			string divBy0_reg = freshVar();
+			code_buffer.emit(divBy0_reg + " = getelementptr [24 x i8], [24 x i8]* @.divBy0, i32 0, i32 0");
+              code_buffer.emit("call void @print(i8* " + divBy0_reg + ")");
+
 			code_buffer.emit("call void @exit(i32 1)");
 			int to_patch = code_buffer.emit("br label @");
 			vector<pair<int,BranchLabelIndex>> list_redundant = CodeBuffer::makelist(pair<int,BranchLabelIndex>(to_patch, FIRST));
@@ -1155,6 +1159,7 @@ InsertFunc:	/*epsilon*/ {
 				code_buffer.emitGlobal("call i32 (i8*, ...) @printf(i8* %0)");
 				code_buffer.emitGlobal("ret void");
 				code_buffer.emitGlobal("}");
+				code_buffer.emitGlobal("@.divBy0 = constant [24 x i8] c\"Error division by zero\\0A\\00\"");
 			}
 ;
 OpenScope: /*epsilon*/ {
