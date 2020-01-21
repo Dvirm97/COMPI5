@@ -574,11 +574,13 @@ Call:	ID LPAREN ExpList RPAREN{
 			}
 			 else {
 			    string reg = freshVar();
-			    str = reg + " = " + "call " + return_type + " @" + $1.get_id() + "(" + places_list + ")";
+			    str = reg + " = " + "call i32 @" + $1.get_id() + "(" + places_list + ")";
 			    code_buffer.emit(str);
 			    $$.set_place(reg);
 			    if (symbol_table.get_func_retType($1.get_id()) == "BOOL") {
-                    string str2 = "br i1 " + reg + ", label @, label @";
+                    string reg2 = freshVar();
+                    code_buffer.emit(reg2 + " =  trunc i32 " + reg + " to i1");
+                    string str2 = "br i1 " + reg2 + ", label @, label @";
                     int to_patch = code_buffer.emit(str2);
                     vector<pair<int,BranchLabelIndex>> t_list = CodeBuffer::makelist(pair<int,BranchLabelIndex>(to_patch, FIRST));
                     vector<pair<int,BranchLabelIndex>> f_list = CodeBuffer::makelist(pair<int,BranchLabelIndex>(to_patch, SECOND));
