@@ -90,11 +90,24 @@ void Symbol_Table::insertEnumVar(const string& id, const string& enumType, const
     }catch(ST_undef& e) {
         throw ST_undefEnum(enumType);
     }
-		string enumType_of_val = get_enumType_of_val(val);
+    try {
+        Datatype dtype = get_datatype(val);
+        string enumType_of_val;
+        if (dtype == ENUM_VAL) {
+            enumType_of_val = get_enumType_of_val(val);
+        }
+        else if (dtype == ENUM_VAR) {
+            enumType_of_val = get_var_type(val);
+        }
+        else throw ST_undefEnumValue(enumType);
         if (enumType_of_val != enumType) {
             throw ST_undefEnumValue(val);
         }
-    insertEnumVar(id, enumType);
+        insertEnumVar(id, enumType);
+    }catch(ST_undef& e) {
+        throw ST_undefEnumValue(enumType);
+    }
+
 }
 void Symbol_Table::insertFunc(const string& id, const string& retType, vector<string>& params_type) {
     if (id_exists(id)) {

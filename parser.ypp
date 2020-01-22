@@ -357,8 +357,14 @@ Statement:	LBRACE OpenScope Statements CloseScope RBRACE{
 				string reg1 = freshVar();
 				string str1 = reg1 + " = getelementptr i32, i32* %stack, i32 " + to_string(offset);
 				code_buffer.emit(str1);
-				int enum_value = symbol_table.enum_to_num($4.get_Val());
-				string str2 = "store i32 " + to_string(enum_value) + ", i32* " + reg1;
+				string str2;
+				if (symbol_table.get_datatype($4.get_Val()) == ENUM_VAL) {
+				    int enum_value = symbol_table.enum_to_num($4.get_Val());
+                    str2 = "store i32 " + to_string(enum_value) + ", i32* " + reg1;
+				}
+				else {
+                    str2 = "store i32 " + $4.get_place() + ", i32* " + reg1;
+				}
 				code_buffer.emit(str2);
 			}
 			|ID ASSIGN Exp SC{
@@ -832,39 +838,38 @@ Exp:	LPAREN Exp RPAREN{
 			$$.reset();
 			try{
 				$$.set_type(symbol_table.get_var_type($1.get_id()));
-
 			}catch(Symbol_Table::ST_undef& e){
 				output::errorUndef(yylineno, e.get_raised_id());
 				exit(0);
 			}
 			$$.set_Val($1.get_id());
 			string type = symbol_table.get_var_type($1.get_id());
-			int offset = symbol_table.get_offset($1.get_id());
-
-			//LLVM:
-			if (symbol_table.get_datatype($1.get_id()) == ENUM_VAL) {
-			    int num = symbol_table.enum_to_num($1.get_id());
-			    $$.set_place(to_string(num));
+			int offset = symbol_table.get_offset($1.get_id()) + num_of_params;
+			
+			if(symbol_table.get_datatype($1.get_id()) == ENUM_VAL){
+				int num = symbol_table.enum_to_num($1.get_id());
+				$$.set_place(to_string(num));
 			}
-			else {
-                string reg1 = freshVar();
-                const string str1 = reg1 + " = getelementptr i32, i32* %stack, i32 " + to_string(offset);
-                code_buffer.emit(str1);
-                string reg2 = freshVar();
-                string str2 = reg2 + " = load i32, i32* " + reg1;
-                code_buffer.emit(str2);
-                if (type == "BOOL") {
-                    string reg3 = freshVar();
-                    string str3 = reg3 + " = trunc i32 " + reg2 + " to i1";
-                    code_buffer.emit(str3);
-                    string str4 = "br i1 " + reg3 + ", label @, label @";
-                    int to_patch = code_buffer.emit(str4);
-                    vector<pair<int,BranchLabelIndex>> t_list = CodeBuffer::makelist(pair<int,BranchLabelIndex>(to_patch, FIRST));
-                    vector<pair<int,BranchLabelIndex>> f_list = CodeBuffer::makelist(pair<int,BranchLabelIndex>(to_patch, SECOND));
-                    $$.set_true_list(t_list);
-                    $$.set_false_list(f_list);
-                }
-                $$.set_place(reg2);
+			
+			else{
+				string reg1 = freshVar();
+				const string str1 = reg1 + " = getelementptr i32, i32* %stack, i32 " + to_string(offset);
+				code_buffer.emit(str1);
+				string reg2 = freshVar();
+				string str2 = reg2 + " = load i32, i32* " + reg1;
+				code_buffer.emit(str2);
+				if (type == "BOOL") {
+					string reg3 = freshVar();
+					string str3 = reg3 + " = trunc i32 " + reg2 + " to i1";
+					code_buffer.emit(str3);
+					string str4 = "br i1 " + reg3 + ", label @, label @";
+					int to_patch = code_buffer.emit(str4);
+					vector<pair<int,BranchLabelIndex>> t_list = CodeBuffer::makelist(pair<int,BranchLabelIndex>(to_patch, FIRST));
+					vector<pair<int,BranchLabelIndex>> f_list = CodeBuffer::makelist(pair<int,BranchLabelIndex>(to_patch, SECOND));
+					$$.set_true_list(t_list);
+					$$.set_false_list(f_list);
+				}
+				$$.set_place(reg2);
 			}
 		}
 		|Call{
