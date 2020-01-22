@@ -357,8 +357,14 @@ Statement:	LBRACE OpenScope Statements CloseScope RBRACE{
 				string reg1 = freshVar();
 				string str1 = reg1 + " = getelementptr i32, i32* %stack, i32 " + to_string(offset);
 				code_buffer.emit(str1);
-				int enum_value = symbol_table.enum_to_num($4.get_Val());
-				string str2 = "store i32 " + to_string(enum_value) + ", i32* " + reg1;
+				string str2;
+				if (symbol_table.get_datatype($4.get_Val()) == ENUM_VAL) {
+				    int enum_value = symbol_table.enum_to_num($4.get_Val());
+                    str2 = "store i32 " + to_string(enum_value) + ", i32* " + reg1;
+				}
+				else {
+                    str2 = "store i32 " + $4.get_place() + ", i32* " + reg1;
+				}
 				code_buffer.emit(str2);
 			}
 			|ID ASSIGN Exp SC{
