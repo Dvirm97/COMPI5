@@ -427,7 +427,11 @@ Statement:	LBRACE OpenScope Statements CloseScope RBRACE{
 				//LLVM:
 				$$.reset();
 				$$.set_type("VOID");
-
+				if ($1.get_type() == "BOOL") {
+				    string next = code_buffer.genLabel();
+				    code_buffer.bpatch($1.get_true_list(), next);
+				    code_buffer.bpatch($1.get_false_list(), next);
+				}
 			}
 			|RETURN SC{
 				if (RetType_flag != "VOID"){
@@ -552,9 +556,9 @@ Call:	ID LPAREN ExpList RPAREN{
 			output::errorPrototypeMismatch(yylineno, $1.get_id(), symbol_table.get_func_types($1.get_id()));
 			exit(0);
 			}
-			$$.set_type(symbol_table.get_func_retType($1.get_id()));
-			vector<Exp>& exp_list = $3.get_exp_list();
 			string return_type = symbol_table.get_func_retType($1.get_id());
+			$$.set_type(return_type);
+			vector<Exp>& exp_list = $3.get_exp_list();
 			if (return_type == "VOID"){
 				return_type = "void";
 			}
@@ -846,7 +850,7 @@ Exp:	LPAREN Exp RPAREN{
 			string type = symbol_table.get_var_type($1.get_id());
 			int offset = symbol_table.get_offset($1.get_id()) + num_of_params;
 			
-			if(symbol_table.get_datatype($1.get_id()) == ENUM_VAL){
+			if (symbol_table.get_datatype($1.get_id()) == ENUM_VAL){
 				int num = symbol_table.enum_to_num($1.get_id());
 				$$.set_place(to_string(num));
 			}
